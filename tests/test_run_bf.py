@@ -323,3 +323,20 @@ def test_shrinking_bf_history_aborts(tmp_path, sssb, bf, monkeypatch):
     with pytest.raises(RuntimeError, match="shrank"):
         go(tmp_path, sssb, bf, T0 + timedelta(minutes=30))
     assert not (tmp_path / "ready").exists()
+
+
+def test_a_network_error_on_one_detail_page_keeps_the_others(tmp_path, sssb):
+    """M6 review: one detail page failing to load must not drop every BF alert."""
+    bad = "202620141"
+
+    class Gone(FakeBF):
+        def __call__(self, url):
+            if url.endswith(f"/{bad}/"):
+                self.calls.append(url)
+                raise OSError("HTTP Error 404")
+            return super().__call__(url)
+
+    bf = Gone(ids=[CORRIDOR, bad, KISTA])
+    rc, phone, _ = go(tmp_path, sssb, bf, T0)
+    assert f"https://bostad.stockholm.se/bostad/{bad}/" in bf.detail_calls()
+    assert rc == 1 and bf_ids(phone) == [("winnable", "bf:" + CORRIDOR)]

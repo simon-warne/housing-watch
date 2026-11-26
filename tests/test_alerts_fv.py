@@ -88,7 +88,10 @@ def test_tied_marked(tmp_path):
 def test_tied_after_my_own_alert_is_quiet(tmp_path):
     """Once I was told it's winnable, a tie is most likely my own application."""
     conn = hist_with(tmp_path, {DUVBO: replace(DET, top_points=4000)})
-    assert fv_listing_alerts(conn, CFG, PTS, FRESH, frozenset({"fv:" + DUVBO}), T0) == []
+    assert (
+        fv_listing_alerts(conn, CFG, PTS, FRESH, frozenset({("fv:" + DUVBO, "2026-11-30")}), T0)
+        == []
+    )
 
 
 def test_points_grow_daily(hist):
@@ -122,7 +125,7 @@ def test_no_applicants_shown_last_call_only(tmp_path):
 def test_lead_lost_after_an_alert(tmp_path):
     conn = hist_with(tmp_path, {DUVBO: replace(DET, top_points=4500, applicants=9)})
     assert fv_listing_alerts(conn, CFG, PTS, FRESH, NONE, T0) == []  # never alerted
-    [a] = fv_listing_alerts(conn, CFG, PTS, FRESH, frozenset({"fv:" + DUVBO}), T0)
+    [a] = fv_listing_alerts(conn, CFG, PTS, FRESH, frozenset({("fv:" + DUVBO, "2026-11-30")}), T0)
     assert (a.kind, a.listing_id, a.priority) == ("lead_lost", "fv:" + DUVBO, "high")
     assert a.title == "FV · Lead lost: Duvbo, Järnvägsgatan 23"
     assert a.body.startswith("Top is now 4500, you have 4000 · 9 applicants · closes Mon 30 Nov")
@@ -137,7 +140,7 @@ def test_fv_alerted_reads_the_alert_log(tmp_path, hist):
     state = open_state(tmp_path / "state.db")
     sent = []
     dispatch(state, fv_listing_alerts(hist, CFG, PTS, FRESH, NONE, T0), sent.append, T0)
-    assert fv_alerted(state) == frozenset({"fv:" + DUVBO})
+    assert fv_alerted(state) == frozenset({("fv:" + DUVBO, "2026-11-30")})
     again = fv_listing_alerts(hist, CFG, PTS, FRESH, fv_alerted(state), T0)
     assert dispatch(state, again, sent.append, T0).sent == [] and len(sent) == 1
 
@@ -169,3 +172,20 @@ def test_digest_without_fv_rows_has_no_fv_section(tmp_path):
     conn = open_db(tmp_path / "history.sqlite")
     d = digest_alert(conn, CFG, Q, frozenset(), SUNDAY_18, fv_points=PTS)
     assert "FV" not in d.title and not any(x.startswith("FV") for x in d.body.splitlines())
+
+
+def test_an_alert_on_an_earlier_ad_of_the_same_flat_does_not_count(tmp_path):
+    """Review: a re-listed flat starts fresh, so no lead lost and no quiet tie from old ads."""
+    old = frozenset({("fv:" + DUVBO, "2026-10-15")})
+    behind = hist_with(tmp_path, {DUVBO: replace(DET, top_points=4500)})
+    assert fv_listing_alerts(behind, CFG, PTS, FRESH, old, T0) == []
+    behind.close()
+    (tmp_path / "t").mkdir()
+    tied = hist_with(tmp_path / "t", {DUVBO: replace(DET, top_points=4000)})
+    assert kinds(fv_listing_alerts(tied, CFG, PTS, FRESH, old, T0)) == [("winnable", "fv:" + DUVBO)]
+
+
+def test_last_call_counts_as_alerted(tmp_path, hist):
+    state = open_state(tmp_path / "state.db")
+    dispatch(state, fv_listing_alerts(hist, CFG, PTS, FRESH, NONE, LAST_CALL_AT), print, T0)
+    assert fv_alerted(state) == frozenset({("fv:" + DUVBO, "2026-11-30")})

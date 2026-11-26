@@ -226,12 +226,12 @@ def _watch_bf(hist, cfg, since, now, get, sleep) -> tuple[int, list]:
     if not listings:
         raise EmptyRun("0 BF listings parsed")
     details: dict[str, BfDetail] = {}
-    errors: list[ParseError] = []
+    errors: list[Exception] = []
     for x in pick_bf_details(hist, listings, cfg, now):
         sleep(PAUSE_S)
         try:
             details[x.id] = parse_bf_detail(get(bf.detail_url(x)), x)
-        except ParseError as e:  # one odd page must not block the others (M5 review)
+        except (ParseError, OSError) as e:  # one odd or missing page must not block the others
             errors.append(e)
     bf_record(hist, listings, details, now)
     alerts = bf_listing_alerts(hist, cfg, since, frozenset(details), now)
@@ -273,12 +273,12 @@ def _watch_fv(hist, cfg, points, state, now, get, sleep) -> tuple[int, list]:
     if not listings:
         raise EmptyRun("0 FV listings parsed")
     details: dict[str, FvDetail] = {}
-    errors: list[ParseError] = []
+    errors: list[Exception] = []
     for x in pick_fv_details(hist, listings, cfg, now):
         sleep(PAUSE_S)
         try:
             details[x.id] = parse_fv_detail(get(fv.detail_url(x)), x)
-        except ParseError as e:  # one odd page must not block the others
+        except (ParseError, OSError) as e:  # one odd or missing page must not block the others
             errors.append(e)
     fv_record(hist, listings, details, now)
     alerts = fv_listing_alerts(hist, cfg, points, frozenset(details), fv_alerted(state), now)

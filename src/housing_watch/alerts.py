@@ -539,15 +539,16 @@ def _fv_applicants(v: FvVerdict) -> str:
 
 
 def _fv_alert(
-    v: FvVerdict, mine: int, alerted: frozenset[str], now: datetime, window: timedelta
+    v: FvVerdict, mine: int, alerted: frozenset[tuple[str, str]], now: datetime, window: timedelta
 ) -> Alert | None:
     x, d = v.listing, v.detail
     dl = fv_deadline(x.deadline)
     if dl <= now:
         return None  # closed: no false "winnable" after the deadline
     lid, url = f"fv:{x.id}", fv_url(x)
+    told = (lid, x.deadline.isoformat()) in alerted  # this ad, not an earlier one (M6 review)
     if v.status == FvStatus.BEHIND:
-        if lid not in alerted:
+        if not told:
             return None
         return Alert(
             kind="lead_lost",
@@ -572,7 +573,7 @@ def _fv_alert(
         return Alert(
             kind="last_call",
             listing_id=lid,
-            state_key=dl.astimezone(UTC).isoformat(),
+            state_key=f"last@{x.deadline.isoformat()}",
             priority="urgent",
             title=f"FV · LAST CALL, closes {local:%H:%M}{_fv_marks(v)}: {_fv_head(x)}",
             body=f"Closes {local:%H:%M} {day} (in {_left(dl - now)}) · {lead}\n"
@@ -581,7 +582,7 @@ def _fv_alert(
         )
     if v.status == FvStatus.NO_APPLICANTS_SHOWN:
         return None  # last call only (Simon, 2026-11-26)
-    if v.status == FvStatus.TIED and lid in alerted:
+    if v.status == FvStatus.TIED and told:
         return None  # after my own alert, a tie is most likely my own application
     return Alert(
         kind="winnable",
@@ -601,14 +602,15 @@ def _fv_alert(
     )
 
 
-def fv_alerted(state: sqlite3.Connection) -> frozenset[str]:
-    """FV listings I was already told I could win (winnable or last call), from the alert log.
-    A later "behind" for one of these is a lost lead."""
+def fv_alerted(state: sqlite3.Connection) -> frozenset[tuple[str, str]]:
+    """(listing id, deadline) of FV ads I was already told I could win (winnable or last call;
+    both keys end in "@<deadline>"), from the alert log. A later "behind" on the same ad is a
+    lost lead; a re-listing has a new deadline, so it starts fresh."""
     rows = state.execute(
-        "SELECT DISTINCT listing_id FROM alerts "
+        "SELECT DISTINCT listing_id, state_key FROM alerts "
         "WHERE listing_id LIKE 'fv:%' AND kind IN ('winnable', 'last_call')"
     ).fetchall()
-    return frozenset(r[0] for r in rows)
+    return frozenset((r[0], r[1].rpartition("@")[2]) for r in rows)
 
 
 def fv_listing_alerts(
@@ -616,7 +618,7 @@ def fv_listing_alerts(
     cfg: Config,
     points: FvPoints | None,
     fresh: frozenset[str],
-    alerted: frozenset[str],
+    alerted: frozenset[tuple[str, str]],
     now: datetime,
 ) -> list[Alert]:
     """FV winnable, last call and lead lost, urgent first, then by rank.

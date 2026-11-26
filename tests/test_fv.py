@@ -213,15 +213,26 @@ def test_detail_copies_must_agree(rissne):
         parse_fv_detail(page, rissne)
 
 
-def test_no_top_points_row_means_none_shown(rissne):
+def test_missing_top_points_row_with_applicants_raises(rissne):
+    """Review: a renamed or re-tagged row must not read as "no applicants shown"."""
     page = text(DETAIL).replace('uppercase">Högst köpoäng</span>', 'uppercase">Något</span>')
-    d = parse_fv_detail(page, rissne)
-    assert d.top_points is None and d.applicants == 40
+    with pytest.raises(ParseError, match="no top points"):
+        parse_fv_detail(page, rissne)
+    page = text(DETAIL).replace("5 022", "<strong>5 022</strong>")
+    with pytest.raises(ParseError):
+        parse_fv_detail(page, rissne)
+
+
+def test_no_top_points_row_and_no_applicants_means_none_shown(rissne):
+    page = text(DETAIL).replace('uppercase">Högst köpoäng</span>', 'uppercase">Något</span>')
+    page = page.replace("Antal sökande</span>\n                40", "Antal sökande</span>\n 0")
+    d = parse_fv_detail(page, replace(rissne, applicants=0))
+    assert d.top_points is None and d.applicants == 0
 
 
 def test_no_applicants_row_means_none_shown(rissne):
     page = text(DETAIL).replace('uppercase">Antal sökande</span>', 'uppercase">Något</span>')
-    assert parse_fv_detail(page, rissne).applicants is None
+    assert parse_fv_detail(page, rissne).applicants is None  # top points still shown
 
 
 def test_top_points_with_a_non_breaking_space(rissne):

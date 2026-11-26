@@ -57,6 +57,7 @@ class FakeFV:
             )
 
         p = fact("Tillträde", self.move_in, p)
+        p = fact("Antal sökande", str(item["usercount"]), p)
         top = self.top.get(lid, "3 000")
         if top is None:
             p = p.replace('uppercase">Högst köpoäng</span>', 'uppercase">Övrigt</span>')
@@ -129,6 +130,7 @@ def test_lead_lost_end_to_end(tmp_path, sssb, fv):
 
 def test_no_top_points_row_last_call_only(tmp_path, sssb, fv):
     fv.top[DUVBO] = None
+    next(i for i in fv.items if i["id"] == DUVBO)["usercount"] = 0
     _, phone, _ = go(tmp_path, sssb, fv, T0)
     assert ("winnable", "fv:" + DUVBO) not in fv_ids(phone)
     _, phone, _ = go(tmp_path, sssb, fv, DUVBO_CLOSE - timedelta(hours=4))
@@ -267,3 +269,18 @@ def test_shrinking_fv_history_aborts(tmp_path, sssb, fv, monkeypatch):
     with pytest.raises(RuntimeError, match="shrank"):
         go(tmp_path, sssb, fv, T0 + timedelta(minutes=30))
     assert not (tmp_path / "ready").exists()
+
+
+def test_a_network_error_on_one_detail_page_keeps_the_others(tmp_path, sssb):
+    """Review: a withdrawn flat (404) between list and detail used to drop every FV alert."""
+
+    class Gone(FakeFV):
+        def __call__(self, url):
+            if url.endswith(RISSNE):
+                self.calls.append(url)
+                raise OSError("HTTP Error 404")
+            return super().__call__(url)
+
+    fv = Gone()
+    rc, phone, _ = go(tmp_path, sssb, fv, T0)
+    assert rc == 1 and fv_ids(phone) == [("winnable", "fv:" + DUVBO)]

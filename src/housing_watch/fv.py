@@ -171,10 +171,16 @@ def parse_fv_detail(page: str, listing: FvListing) -> FvDetail:
         raise ParseError("Anmäl senast", closes, nr, why="differs from the list")
     if "Tillträde" not in facts:
         raise ParseError("Tillträde", sorted(facts), nr, why="no move-in fact")
+    top = _count(facts, "Högst köpoäng", nr)
+    applicants = _count(facts, "Antal sökande", nr)
+    shown = applicants if applicants is not None else listing.applicants
+    if top is None and shown > 0:
+        # A renamed or re-tagged row must not read as "no applicants shown" (M6 review).
+        raise ParseError("Högst köpoäng", shown, nr, why="applicants but no top points")
     return FvDetail(
         move_in=_iso(facts["Tillträde"], "Tillträde", nr),
-        top_points=_count(facts, "Högst köpoäng", nr),
-        applicants=_count(facts, "Antal sökande", nr),
+        top_points=top,
+        applicants=applicants,
     )
 
 
