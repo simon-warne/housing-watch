@@ -250,12 +250,16 @@ def digest_alert(
         for v, removed in rows
         if not removed and v.eligible and v.ahead and v.listing.id not in booked
     )
-    shown = sorted((p for p in rows if p[0].in_window), key=lambda p: rank_key(p[0]))
-    outside = len(rows) - len(shown)
+    # Move-in before the window: listed (Simon, 2026-11-26). After it: counted only.
+    shown = sorted(
+        (p for p in rows if p[0].listing.move_in <= cfg.move_in_to),
+        key=lambda p: (not p[0].in_window, rank_key(p[0])),
+    )
+    late = len(rows) - len(shown)
 
     lines = ["Winning days by area: " + (" · ".join(ranges) or "none closed this week")]
-    if outside:
-        lines.append(f"{outside} more outside the move-in window")
+    if late:
+        lines.append(f"{late} more after the move-in window")
     rest = [_digest_line(v, removed, booked, cfg) for v, removed in shown]
     while rest:
         line = rest.pop(0)
@@ -286,6 +290,8 @@ def _digest_line(v: Verdict, removed: datetime | None, booked: frozenset[str], c
         tags.append("booked")
     if removed:
         tags.append("closed")
+    if x.move_in < cfg.move_in_from:
+        tags.append(f"early move-in {x.move_in.isoformat()}")
     top = x.top_days if x.top_days is not None else "none"
     return f"{x.area}, {kind}, {_kr(x.rent)} · top {top} · {', '.join(tags)}"
 

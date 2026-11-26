@@ -25,7 +25,7 @@ rent:
   stretch: 7000
 
 move_in:
-  from: 2027-06-01
+  from: 2027-04-01
   to: 2027-10-31
 
 last_call_hours: 5

@@ -1,0 +1,15 @@
+        hist = open_db(tmp_path / "h.sqlite")
+        strix = next(x for x in fixture_listings() if x.id == STRIX)
+        early = replace(strix, move_in=date(2027, 3, 31))
+        late = replace(strix, id="9999-0000-001", move_in=date(2027, 11, 1))
+        record(hist, [early, late], {}, T0)
+        a = digest_alert(hist, CFG, Q, frozenset(), SUNDAY_18)
+        assert "2 seen" in a.title
+>       assert "Strix, Rum i korridor, 3,841 kr · top 132 · winnable, early move-in 2027-03-31" in a.body
+E       AssertionError: assert 'Strix, Rum i korridor, 3,841 kr · top 132 · winnable, early move-in 2027-03-31' in 'Winning days by area: none closed this week\n2 more outside the move-in window'
+E        +  where 'Winning days by area: none closed this week\n2 more outside the move-in window' = Alert(kind='digest', listing_id=None, state_key='2026-W48', priority='low', title='Weekly digest, week 48: 2 seen, 0 winnable', body='Winning days by area: none closed this week\n2 more outside the move-in window', url=None).body
+
+tests/test_alerts.py:317: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_alerts.py::test_digest_lists_early_move_ins_and_counts_late_ones
+1 failed, 271 passed in 1.66s

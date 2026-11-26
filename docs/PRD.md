@@ -29,7 +29,7 @@ Never miss an SSSB room I can win, and build my own data on how many queue days 
 - **Floor:** ground floor ranked lower, not excluded.
 - **Types:** corridor room ("Rum i korridor"); studio ("1 rum & pentry", "1 rum & kök") if within rent. 2+ rooms are never alerted but listed in the weekly digest (open to sharing with friends); unknown types are shown in the digest too. Exclude "room in a double" (shared bathroom) and collective housing. (Simon, 2026-11-26)
 - **Rent:** up to 6,000 kr/month alerts normally; lower ranks higher. **Stretch:** 6,001–7,000 kr alerts only when it is winnable *and* central or Forum/Roslagstull, labelled "over budget". Above 7,000: weekly digest only. Both limits in config. (Simon, 26 Nov: no more than 6,000 unless it is really good.)
-- **Move-in window:** configurable; default 2027-06-01 to 2027-10-31 (autumn possible). Outside the window: logged, not alerted.
+- **Move-in window:** configurable; 2027-04-01 to 2027-10-31 (spring and autumn possible; Simon, 2026-11-26). Move-in before the window: listed in the weekly digest, not alerted (Simon, 2026-11-26). After it: logged and counted in the digest, not alerted.
 
 ## 4. Alerts
 | Alert | When | Priority |

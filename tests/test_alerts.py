@@ -305,6 +305,22 @@ def test_digest_shows_other_types(tmp_path):
     assert "other type: Rum i dubbel" in a.body
 
 
+def test_digest_lists_early_move_ins_and_counts_late_ones(tmp_path):
+    # Before the window (1 Apr 2027): listed with its date, never alerted. After: counted only.
+    hist = open_db(tmp_path / "h.sqlite")
+    strix = next(x for x in fixture_listings() if x.id == STRIX)
+    early = replace(strix, move_in=date(2027, 3, 31))
+    late = replace(strix, id="9999-0000-001", move_in=date(2027, 11, 1))
+    record(hist, [early, late], {}, T0)
+    a = digest_alert(hist, CFG, Q, frozenset(), SUNDAY_18)
+    assert "2 seen" in a.title
+    assert (
+        "Strix, Rum i korridor, 3,841 kr · top 132 · winnable, early move-in 2027-03-31" in a.body
+    )
+    assert "1 more after the move-in window" in a.body
+    assert a.body.count("Strix, Rum i korridor") == 1
+
+
 def test_digest_body_fits_ntfy(tmp_path):
     hist = open_db(tmp_path / "h.sqlite")
     strix = next(x for x in fixture_listings() if x.id == STRIX)

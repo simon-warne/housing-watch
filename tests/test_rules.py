@@ -49,13 +49,13 @@ def test_behind_but_cheap_is_still_eligible(room):
     assert v.eligible and v.status == Status.BEHIND
 
 
-@pytest.mark.parametrize("move_in", [date(2027, 5, 31), date(2027, 11, 1), date(2027, 1, 1)])
+@pytest.mark.parametrize("move_in", [date(2027, 3, 31), date(2027, 11, 1), date(2027, 1, 1)])
 def test_outside_window_not_eligible(room, move_in):
     v = classify(replace(room, move_in=move_in), CFG, MINE)
     assert not v.eligible and not v.in_window
 
 
-@pytest.mark.parametrize("move_in", [date(2027, 6, 1), date(2027, 10, 31)])
+@pytest.mark.parametrize("move_in", [date(2027, 4, 1), date(2027, 10, 31)])
 def test_window_edges_inclusive(room, move_in):
     assert classify(replace(room, move_in=move_in), CFG, MINE).eligible
 

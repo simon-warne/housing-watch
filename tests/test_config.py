@@ -29,7 +29,7 @@ def test_real_config_loads():
     assert cfg.alert_types == ("Rum i korridor", "1 rum & pentry", "1 rum & kök")
     assert "2 rum & kök" in cfg.digest_types
     assert cfg.rent_max == 6000 and cfg.rent_stretch == 7000
-    assert cfg.move_in_from == date(2027, 6, 1) and cfg.move_in_to == date(2027, 10, 31)
+    assert cfg.move_in_from == date(2027, 4, 1) and cfg.move_in_to == date(2027, 10, 31)
     assert cfg.last_call_hours == 5
     assert cfg.digest_weekday == 6 and cfg.digest_time == time(18, 0)
     assert cfg.tier("Idun") == 0 and cfg.tier("Forum") == 1 and cfg.tier("Lappkärrsberget") == 5
