@@ -1,0 +1,5 @@
+ImportError while importing test module '/Users/simonwarne/Developer/housing-watch/tests/test_alerts.py'.
+E   ModuleNotFoundError: No module named 'housing_watch.alerts'
+ImportError while importing test module '/Users/simonwarne/Developer/housing-watch/tests/test_config.py'.
+E   ModuleNotFoundError: No module named 'housing_watch.config'
+ImportError while importing test module '/Users/simonwarne/Developer/housing-watch/tests/test_rules.py'.

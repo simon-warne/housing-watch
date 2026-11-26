@@ -2,6 +2,7 @@
 
 A listing's state is every `Listing` field except `seen_at`, plus the deadline from its detail
 page. A run that sees no change writes nothing, so the DB file stays byte-identical.
+This DB is committed to the public `data` branch: it holds only public SSSB data.
 """
 
 import json
@@ -41,18 +42,8 @@ CREATE TABLE IF NOT EXISTS observations (
     deadline   TEXT
 );
 CREATE INDEX IF NOT EXISTS observations_by_listing ON observations (listing_id, id);
-CREATE TABLE IF NOT EXISTS alerts (
-    id         INTEGER PRIMARY KEY,
-    listing_id TEXT REFERENCES listings(id),
-    kind       TEXT NOT NULL,
-    state_key  TEXT NOT NULL,
-    sent_at    TEXT NOT NULL,
-    message    TEXT NOT NULL
-);
--- COALESCE: a plain UNIQUE treats NULLs as distinct, so heartbeat alerts would never dedupe.
-CREATE UNIQUE INDEX IF NOT EXISTS alerts_dedupe
-    ON alerts (COALESCE(listing_id, ''), kind, state_key);
 """
+# No alerts here: this DB is public (data branch). Alerts live in the private state.db (M3).
 
 # Columns compared to decide "changed" (everything but id, listing_id, seen_at).
 STATE_COLS = (
@@ -145,6 +136,38 @@ def deadline(conn: sqlite3.Connection, id_: str) -> datetime | None:
     """The listing's latest known booking deadline (UTC), or None if never fetched."""
     row = _latest_row(conn, id_)
     return datetime.fromisoformat(row["deadline"]) if row and row["deadline"] else None
+
+
+def _active_rows(conn: sqlite3.Connection, where: str, args: tuple) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT o.*, l.removed_at FROM listings l JOIN observations o ON o.id = "
+        "(SELECT MAX(id) FROM observations WHERE listing_id = l.id) "
+        f"WHERE {where} ORDER BY l.id",
+        args,
+    ).fetchall()
+
+
+def _dl(row: sqlite3.Row) -> datetime | None:
+    return datetime.fromisoformat(row["deadline"]) if row["deadline"] else None
+
+
+def active(conn: sqlite3.Connection) -> list[tuple[Listing, datetime | None]]:
+    """Every listing not removed, in its latest state, with its known deadline."""
+    return [(_listing(r), _dl(r)) for r in _active_rows(conn, "l.removed_at IS NULL", ())]
+
+
+def seen_since(
+    conn: sqlite3.Connection, since: datetime
+) -> list[tuple[Listing, datetime | None, datetime | None]]:
+    """Listings on SSSB at any point since `since`: (latest state, deadline, removed_at).
+
+    A removed listing's latest state is its last one before removal (its winning days).
+    """
+    rows = _active_rows(conn, "l.removed_at IS NULL OR l.removed_at >= ?", (_ts(since),))
+    return [
+        (_listing(r), _dl(r), datetime.fromisoformat(r["removed_at"]) if r["removed_at"] else None)
+        for r in rows
+    ]
 
 
 def _insert(conn: sqlite3.Connection, id_: str, seen: str, state: dict) -> None:

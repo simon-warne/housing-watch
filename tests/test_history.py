@@ -203,26 +203,14 @@ def test_open_db_keeps_existing_data(tmp_path, listings):
     conn.close()
 
 
-def test_alerts_table_unique(db, listings):
+def test_history_db_has_no_alerts_table(db):
+    # The history DB is public; alerts live in state.db (plan M3).
     _, conn = db
-    record(conn, listings, {}, T0)
-    row = (DETAIL_ID, "winnable", "k1", T0.isoformat(), "msg")
-    sql = "INSERT INTO alerts (listing_id, kind, state_key, sent_at, message) VALUES (?,?,?,?,?)"
-    conn.execute(sql, row)
-    with pytest.raises(sqlite3.IntegrityError):
-        conn.execute(sql, row)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert tables == {"listings", "observations"}
 
 
 # Review fixes
-def test_heartbeat_alerts_dedupe_with_null_listing(db):
-    _, conn = db
-    row = (None, "heartbeat", "3-fails", T0.isoformat(), "msg")
-    sql = "INSERT INTO alerts (listing_id, kind, state_key, sent_at, message) VALUES (?,?,?,?,?)"
-    conn.execute(sql, row)
-    with pytest.raises(sqlite3.IntegrityError):
-        conn.execute(sql, row)
-
-
 def test_deadline_readable(db, listings, detail):
     _, conn = db
     record(conn, listings, {DETAIL_ID: detail}, T0)

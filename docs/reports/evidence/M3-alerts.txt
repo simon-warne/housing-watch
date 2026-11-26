@@ -1,0 +1,89 @@
+Setup: fixture with move-in set to 2027-07-01, made-up queue days 180@2026-11-26,
+BOOKED_IDS = Forum 2118-0403-042, now = Mon 30 Nov 11:20 (deadline of Strix 16:00).
+
+===== run 1 =====
+[urgent] LAST CALL, closes 16:00: Strix, Rum i korridor, 3,841 kr
+Closes 16:00 today (in 4 h 40 min) · you lead 184 vs 132 · 5 applicants
+Armégatan 32 A / 1110, floor 1 · move-in 2027-07-01
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=59346d4b4c6d72334639635355527562445a55345766746a4e2f4a50586974415070374749384b4d5752553d
+
+[high] Lead lost: Forum, Körsbärsvägen 4 C / 1019
+Top is now 504, you have 184 · 3 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=53436838582b47685832686b50306d524f6857415a6370475073376942716e354848634a7271396737666b3d
+
+[high] Winnable: Roslagstull, Rum i korridor, 4,514 kr
+Roslagstull · Roslagstullsbacken 5 / 1704, floor 7
+4,514 kr/month (10 mån hyra, Elström ingår, Max 4 år) · move-in 2027-07-01
+Top 179 vs your 184 · 3 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=6e4f762b2f5a765942686a32725244667564436b424e2f5561482b30647259376c784751532b327661794d3d
+
+[high] Winnable: Roslagstull, Rum i korridor, 4,523 kr
+Roslagstull · Roslagstullsbacken 5 / 1610, floor 6
+4,523 kr/month (10 mån hyra, Elström ingår, Max 4 år) · move-in 2027-07-01
+Top 175 vs your 184 · 2 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=55756b48494a6549527762337770786f62436a4166526a4a525543536e4a346b613359325a6f575856356f3d
+
+[high] Winnable: Pax, Rum i korridor, 4,181 kr
+Pax · Emmylundsvägen 3 / 1704, floor 7
+4,181 kr/month (10 mån hyra, Elström ingår) · move-in 2027-07-01
+Top 182 vs your 184 · 9 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=2f347961583271624656417a6f76646931734462796a5439386756445336574731426476492f674a6737493d
+
+[high] Winnable: Kungshamra, Rum i korridor, 4,171 kr
+Kungshamra · Kungshamra 41 / 1011, ground floor
+4,171 kr/month (10 mån hyra, Elström ingår, Max 4 år) · move-in 2027-07-01
+Top 175 vs your 184 · 3 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=6b4e6834547a72684155742f3166716d4f4d42535551676f4a797672574869722f624a50456a5a653335593d
+
+[high] Winnable: Lappkärrsberget, Rum i korridor, 4,767 kr
+Lappkärrsberget · Forskarbacken 1 / 1311, floor 3
+4,767 kr/month (10 mån hyra, Elström ingår) · move-in 2027-07-01
+Top 178 vs your 184 · 4 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=5554416c714f652f434c6239535772556e487030546c327730784b3665615a4e6f312b4a4f50726a6d4c513d
+
+[high] Winnable: Lappkärrsberget, Rum i korridor, 4,745 kr
+Lappkärrsberget · Amanuensvägen 3 / 1011, ground floor
+4,745 kr/month (10 mån hyra, Elström ingår) · move-in 2027-07-01
+Top 167 vs your 184 · 4 applicants
+  -> https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=62334f572b2f696e69546932306757655778685269354459365861566a546c6c70554f70463141347353673d
+
+[low] Weekly digest, week 48: 24 seen, 7 winnable
+Winning days by area: none closed this week
+Idun, 1 rum & pentry, 6,057 kr · top 1190 · behind, over budget
+Nyponet, 3 rum & kök, 10,314 kr · top 1553 · behind
+Nyponet, 2 rum & kök, 10,448 kr · top 1553 · behind
+Forum, Rum i korridor, 4,690 kr · top 504 · behind, booked
+Roslagstull, Rum i korridor, 4,514 kr · top 179 · winnable
+Roslagstull, Rum i korridor, 4,523 kr · top 175 · winnable
+Jerum, Rum i korridor, 4,743 kr · top 314 · behind
+Strix, Rum i korridor, 3,841 kr · top 132 · winnable
+Pax, Rum i korridor, 4,181 kr · top 182 · winnable
+Pax, 1 rum & pentry, 5,266 kr · top 329 · behind
+Pax, 1 rum & pentry, 5,266 kr · top 329 · behind
+Strix, 1 rum & kök, 6,864 kr · top 94 · winnable, over budget
+Strix, 1 rum & kök, 7,172 kr · top 94 · winnable, over budget
+Kungshamra, 1 rum & kök, 7,179 kr · top 60 · winnable, over budget
+Kungshamra, 3 rum & kök, 13,649 kr · top 139 · winnable
+Kungshamra, Rum i korridor, 4,171 kr · top 175 · winnable
+Lappkärrsberget, Rum i korridor, 4,767 kr · top 178 · winnable
+Lappkärrsberget, 1 rum & kök, 8,215 kr · top 93 · winnable, over budget
+Lappkärrsberget, 1 rum & kök, 8,215 kr · top 93 · winnable, over budget
+Lappkärrsberget, 1 rum & kök, 8,426 kr · top 93 · winnable, over budget
+Lappkärrsberget, 1 rum & kök, 8,524 kr · top 23 · winnable, over budget
+Lappkärrsberget, 3 rum & pentry, 9,694 kr · top 766 · behind
+Lappkärrsberget, Rum i korridor, 4,745 kr · top 167 · winnable
+Lappkärrsberget, 1 rum & pentry, 6,227 kr · top 182 · winnable, over budget
+  -> None
+
+-> sent 9, failed 0
+
+===== run 2 =====
+-> sent 0, failed 0
+
+===== heartbeat after 3 failed runs =====
+[high] housing-watch: 3 failed runs since 11:20
+Last error: ParseError: hyra in 5102-3203-028: unexpected '3,841'
+  -> None
+
+history tables: ['listings', 'observations']
+state tables:   ['alerts', 'meta']

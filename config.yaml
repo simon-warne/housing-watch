@@ -1,0 +1,35 @@
+# housing-watch criteria (PRD §3). Committed, so nothing personal here:
+# queue days and booked listings come from secrets (QUEUE_DAYS, QUEUE_DAYS_UNTIL, BOOKED_IDS).
+
+types:
+  # These alert (if rent, area and move-in fit).
+  alert: [Rum i korridor, 1 rum & pentry, 1 rum & kök]
+  # These never alert but are listed in the weekly digest. Any type in neither list is shown
+  # in the digest as "other type".
+  digest: [2 rum & kök, 2 rum & pentry, 3 rum & kök, 3 rum & pentry, 4 rum & kök]
+
+# Best first. Ranking only orders alerts, it never excludes; unlisted areas rank last.
+area_tiers:
+  - [Idun, Domus, Mjölner, Tanto, Nyponet, Kurland]
+  - [Forum]
+  - [Roslagstull]
+  - [Jerum, Fyrtalet]
+  - [Kungshamra, Strix, Pax]
+  - [Lappkärrsberget]
+
+# 6,001 to rent.stretch alerts only here, and only when winnable or tied ("over budget").
+stretch_areas: [Idun, Domus, Mjölner, Tanto, Nyponet, Kurland, Forum, Roslagstull]
+
+rent:
+  max: 6000
+  stretch: 7000
+
+move_in:
+  from: 2027-06-01
+  to: 2027-10-31
+
+last_call_hours: 5
+
+digest:
+  weekday: sunday
+  time: "18:00"

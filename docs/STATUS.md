@@ -1,27 +1,34 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-26, end of M2 (history). Reports: `docs/reports/M0.md`, `M1.md`, `M2.md`.
+Updated: 2026-11-26, end of M3 (rules and alerts). Reports: `docs/reports/M0.md` to `M3.md`.
 
 ## Where things stand
-- M0 done (`m0`, pushed). SSSB listings come logged out from `GET /widgets/?…widgets[]=objektlistabilder@lagenheter` (JSONP), all in one request, queue days included. The deadline comes from the detail widget `objektintresse`.
-- M1 done (`m1`, pushed). `src/housing_watch/sssb.py` parses into `Listing`/`Detail`, strictly.
-- M2 done (`m2`, **not pushed**). `src/housing_watch/history.py` writes SQLite with change-only observations, so an unchanged run leaves the file byte-identical. It detects new, changed and removed listings. The deadline joins by id and carries forward. The empty-list guard means 0 listings removes nothing. The `alerts` table already has its dedupe index. 114 tests pass.
+- M0 to M2 are done and pushed (`m0`, `m1`, `m2`).
+- M3 is done (`m3`, **not pushed**). `config.yaml` and `config.py` hold the criteria; queue days and BOOKED_IDS come from env. `rules.py` gives status, eligibility and ranking. `alerts.py` covers the five alerts with dedupe, through a private `state.db` (alert log and failure streak). The history DB is public and holds no alerts. 205 tests pass.
 
 ## Next, in order
-1. Simon pushes `main` and the `m2` tag.
-2. M3 rules and alerts in a fresh session (plan mode): `config.yaml`, my queue days (from a secret/variable, never committed), the five alerts in PRD §4, dedupe through `alerts`, and a look from Simon at the alert wording.
-   - Use `Changes` from `record()`, plus `latest()` and `deadline()`.
-   - A deadline-only change shows up as an `(old, new)` pair that is equal apart from `seen_at`: read `deadline()`.
+1. Simon decides on the privacy item below, then pushes `main` and the `m3` tag.
+2. M4 goes live in a fresh session (plan mode):
+   - The runner: fetch the list, then the detail pages of eligible listings for their deadline, then `record()`.
+   - On success, `run_ok`, `listing_alerts` and `digest_alert`; on failure or 0 listings, `run_failed`; then `dispatch`.
+   - ntfy `send` with priorities: urgent = 5 (rings through Do Not Disturb), high = 4, low = 2. Click = `url`.
+   - The schedule at odd minutes, plus a keep-alive.
+   - The `data` branch commits `history.sqlite` and an **encrypted** `state.db` (key from a secret).
+   - No alert text or queue days in Action logs.
+   - Secrets: `QUEUE_DAYS`, `QUEUE_DAYS_UNTIL`, the state key. Variable: `BOOKED_IDS`.
+   - Within 48 h of a deadline, consider using the detail page's live top days (PRD §1: no false "winnable").
 
 ## Open for Simon
-- Nothing.
+- **Real queue days are public:** `docs/PRD.md` §3 and `docs/reports/M0.md` on `origin/main`. Redact both and force-push a rewritten history, or accept it (`docs/reports/M3.md`).
+- Before going live: check Mina sidor's number against the computed one, and when the daily +1 lands.
 
 ## Gotchas learned
-- `/widgets/` ignores `pagination` and unknown `omr=`; `TOTAL@lagenheter` ignores filters.
+- `/widgets/` ignores `pagination` and unknown `omr=`. `TOTAL@lagenheter` ignores filters.
 - Fixture responses carry a session `CSRFtoken`: replace it before committing new fixtures.
-- ntfy's reply echoes the topic: send its output to /dev/null in Actions.
-- Pushing from Claude is blocked by the permission check; Simon pushes.
-- No `gitleaks` locally (CI runs it).
+- ntfy's reply echoes the topic, so send its output to /dev/null in Actions.
+- Claude can't push (blocked by the permission check); Simon pushes. There's no local `gitleaks` (CI runs it).
 - `hyra` uses a non-breaking space (`\xa0`). `parse_detail` needs the listing's objektNr.
-- Unbooked listings: shape guessed (empty status). Unknown text raises on purpose.
-- SQLite UNIQUE treats NULLs as distinct: dedupe uses a `COALESCE` index.
-- `record()` needs every `Listing.seen_at` equal to the run's `seen_at` (parse with the same timestamp).
+- SQLite UNIQUE treats NULLs as distinct, so dedupe uses a `COALESCE` index (now in `state.db`).
+- `record()` needs every `Listing.seen_at` to equal the run's `seen_at`.
+- SSSB's `detaljUrl` is `http://`; alerts upgrade it to https.
+- Tests that span days must allow for queue days growing (Pax, top 182, turns winnable at +3 days with 180).
+- Never write real queue days into docs or plans: use placeholders.
