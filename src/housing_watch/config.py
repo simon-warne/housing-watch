@@ -25,6 +25,21 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True)
+class BfConfig:
+    types: tuple[str, ...]
+    bostad_snabbt: bool
+    municipalities: tuple[str, ...]
+    tier1: tuple[str, ...]
+    alert_max_rooms: float
+
+    def tier(self, municipality: str, district: str) -> int | None:
+        """0 = inner city, 1 = the rest of the municipalities in scope, None = out of scope."""
+        if municipality.casefold() not in (m.casefold() for m in self.municipalities):
+            return None
+        return 0 if district.casefold() in (d.casefold() for d in self.tier1) else 1
+
+
+@dataclass(frozen=True)
 class Config:
     alert_types: tuple[str, ...]
     digest_types: tuple[str, ...]
@@ -37,6 +52,7 @@ class Config:
     last_call_hours: float
     digest_weekday: int  # Monday = 0
     digest_time: time
+    bf: BfConfig
 
     def tier(self, area: str) -> int:
         """0 = best; unlisted areas rank last (len(area_tiers))."""
@@ -96,7 +112,16 @@ def load_config(path: str | Path) -> Config:
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
         raise ConfigError(f"config.yaml: {e}") from None
-    top = {"types", "area_tiers", "stretch_areas", "rent", "move_in", "last_call_hours", "digest"}
+    top = {
+        "types",
+        "area_tiers",
+        "stretch_areas",
+        "rent",
+        "move_in",
+        "last_call_hours",
+        "digest",
+        "bf",
+    }
     d = _keys(raw, top, "config")
     types = _keys(d["types"], {"alert", "digest"}, "types")
     alert_types = _names(types["alert"], "types.alert")
@@ -135,6 +160,15 @@ def load_config(path: str | Path) -> Config:
     if not m:
         raise ConfigError('digest.time: expected "HH:MM"')
 
+    bf = _keys(
+        d["bf"], {"types", "bostad_snabbt", "municipalities", "tier1", "alert_max_rooms"}, "bf"
+    )
+    if not isinstance(bf["bostad_snabbt"], bool):
+        raise ConfigError("bf.bostad_snabbt: expected true or false")
+    rooms = bf["alert_max_rooms"]
+    if isinstance(rooms, bool) or not isinstance(rooms, int | float) or rooms <= 0:
+        raise ConfigError("bf.alert_max_rooms: expected a positive number")
+
     return Config(
         alert_types=alert_types,
         digest_types=digest_types,
@@ -147,6 +181,13 @@ def load_config(path: str | Path) -> Config:
         last_call_hours=float(hours),
         digest_weekday=WEEKDAYS.index(dig["weekday"]),
         digest_time=time(int(m.group(1)), int(m.group(2))),
+        bf=BfConfig(
+            types=_names(bf["types"], "bf.types"),
+            bostad_snabbt=bf["bostad_snabbt"],
+            municipalities=_names(bf["municipalities"], "bf.municipalities"),
+            tier1=_names(bf["tier1"], "bf.tier1"),
+            alert_max_rooms=float(rooms),
+        ),
     )
 
 
@@ -163,6 +204,19 @@ def load_queue_days(env: Mapping[str, str]) -> QueueDays:
     if until < base_date:
         raise ConfigError("QUEUE_DAYS_UNTIL is before the QUEUE_DAYS date")
     return QueueDays(base=int(m.group(1)), base_date=base_date, until=until)
+
+
+def load_bf_since(env: Mapping[str, str]) -> date | None:
+    """BF_QUEUE_SINCE="YYYY-MM-DD" (secret): my BF queue start date. Unset = no BF alerts."""
+    raw = (env.get("BF_QUEUE_SINCE") or "").strip()
+    if not raw:
+        return None
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+            raise ValueError
+        return date.fromisoformat(raw)
+    except ValueError:
+        raise ConfigError('BF_QUEUE_SINCE: not "YYYY-MM-DD"') from None
 
 
 def load_booked(env: Mapping[str, str]) -> frozenset[str]:

@@ -33,3 +33,31 @@ last_call_hours: 5
 digest:
   weekday: sunday
   time: "18:00"
+
+# Bostadsförmedlingen (M5, Simon 2026-11-26). Rent, move-in window and last call as above;
+# the stretch band (6,001 to rent.stretch) applies in tier 1 only. My BF queue start date
+# comes from the secret BF_QUEUE_SINCE.
+bf:
+  # Lagenhetstyp values that count. Bostad snabbt listings count whatever their type.
+  types: [Studentlägenhet, Studentkorridor, Ungdomslägenhet, UngdomKorttid, Korttidskontrakt]
+  bostad_snabbt: true
+  # Everything outside these municipalities is out of scope (not alerted, not in the digest).
+  municipalities: [Stockholm, Solna, Sundbyberg]
+  # Tier 1 = inner city. Any other district inside the municipalities above is tier 2.
+  tier1:
+    - Södermalm
+    - Vasastaden
+    - Kungsholmen
+    - Norrmalm
+    - Östermalm
+    - Gamla Stan
+    - Norra Djurgården
+    - Ladugårdsgärdet
+    - Stadshagen
+    - Marieberg
+    - Hjorthagen
+    - Reimersholme
+    - Långholmen
+    - Djurgården
+  # More rooms than this: digest only (as 2+ rooms on SSSB).
+  alert_max_rooms: 1.5

@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from housing_watch.config import ConfigError, load_booked, load_config, load_queue_days
+from housing_watch.config import (
+    ConfigError,
+    load_bf_since,
+    load_booked,
+    load_config,
+    load_queue_days,
+)
 
 ROOT = Path(__file__).parent.parent
 REAL = ROOT / "config.yaml"
@@ -115,3 +121,57 @@ def test_booked_ids(raw, want):
 def test_booked_ids_reject_junk():
     with pytest.raises(ConfigError):
         load_booked({"BOOKED_IDS": "5102-3203-028; rm -rf"})
+
+
+# --- M5 part B: Bostadsförmedlingen ---
+def test_real_config_bf_section():
+    bf = load_config(REAL).bf
+    assert bf.types == (
+        "Studentlägenhet",
+        "Studentkorridor",
+        "Ungdomslägenhet",
+        "UngdomKorttid",
+        "Korttidskontrakt",
+    )
+    assert bf.bostad_snabbt is True
+    assert bf.municipalities == ("Stockholm", "Solna", "Sundbyberg")
+    assert bf.alert_max_rooms == 1.5
+    assert bf.tier("Stockholm", "Södermalm") == 0
+    assert bf.tier("Stockholm", "gamla stan") == 0
+    assert bf.tier("Stockholm", "Kista") == 1
+    assert bf.tier("Solna", "Hagalund") == 1
+    assert bf.tier("Huddinge", "Flemingsberg") is None
+    assert bf.tier("Nacka", "Södermalm") is None  # a tier-1 name outside scope stays out
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda d: d.pop("bf"),
+        lambda d: d["bf"].pop("tier1"),
+        lambda d: d["bf"].update(types=[]),
+        lambda d: d["bf"].update(municipalities=[]),
+        lambda d: d["bf"].update(bostad_snabbt="yes"),
+        lambda d: d["bf"].update(alert_max_rooms=0),
+        lambda d: d["bf"].update(extra=1),
+        lambda d: d["bf"].update(tier1=["Södermalm", "södermalm"]),
+    ],
+)
+def test_bad_bf_section_raises(tmp_path, edit):
+    data = real_data()
+    edit(data)
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path, data))
+
+
+def test_bf_queue_since():
+    assert load_bf_since({}) is None
+    assert load_bf_since({"BF_QUEUE_SINCE": " "}) is None
+    assert load_bf_since({"BF_QUEUE_SINCE": "2026-11-20"}) == date(2026, 11, 20)
+
+
+@pytest.mark.parametrize("raw", ["20261120", "2026-13-01", "soon", "2026-11-20@x"])
+def test_bad_bf_queue_since_raises_without_echo(raw):
+    with pytest.raises(ConfigError) as e:
+        load_bf_since({"BF_QUEUE_SINCE": raw})
+    assert raw not in str(e.value)
