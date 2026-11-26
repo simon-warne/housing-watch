@@ -363,7 +363,7 @@ def run(
     queue = load_queue_days(env)
     booked = load_booked(env)
     # Per-source secrets: a bad one stops only that source's part, with a note (Simon,
-    # 2026-11-27). QUEUE_DAYS and STATE_KEY are needed by everything, so they raise here.
+    # 2026-11-26). QUEUE_DAYS and STATE_KEY are needed by everything, so they raise here.
     bf_since, bf_err = _secret(lambda: load_bf_since(env))
     fv_points, fv_err = _secret(lambda: load_fv_points(env, now.astimezone(STOCKHOLM).date()))
     key = env.get("STATE_KEY")

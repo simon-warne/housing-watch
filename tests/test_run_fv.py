@@ -206,7 +206,7 @@ def test_no_points_records_but_does_not_alert(tmp_path, sssb, fv):
     "bad", [{"FV_POINTS": "many"}, {"FV_POINTS_ON": "2026-12-01"}, {"FV_POINTS_ON": ""}]
 )
 def test_bad_points_stop_only_fv_and_leave_a_note(tmp_path, sssb, fv, bad, capsys):
-    """Simon, 2026-11-27: a bad FV secret stops FV's part only, with a note on the phone."""
+    """Simon, 2026-11-26: a bad FV secret stops FV's part only, with a note on the phone."""
     rc, phone, _ = go(tmp_path, sssb, fv, T0, env={**ENV_FV, **bad})
     assert rc == 1 and fv.calls == [] and sssb.calls  # SSSB still ran
     assert capsys.readouterr().out.strip() == "ok: 24 listings · fv failed: ConfigError"

@@ -436,7 +436,7 @@ def test_state_size_does_not_change_when_alerts_are_logged(tmp_path, sssb):
 
 
 def test_bad_sssb_queue_days_still_stop_the_whole_run(tmp_path):
-    """Simon, 2026-11-27: only per-source secrets stop just their source; QUEUE_DAYS is
+    """Simon, 2026-11-26: only per-source secrets stop just their source; QUEUE_DAYS is
     needed by SSSB and the digest, so it still stops everything before any request."""
     sssb = FakeSSSB()
     with pytest.raises(Exception, match="QUEUE_DAYS"):

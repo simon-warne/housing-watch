@@ -1,5 +1,5 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27, M6 Förvaltaren done (tag `m6-fv` pushed), plus Simon's follow-ups (digest count, per-source secret errors), not pushed yet. Reports: `docs/reports/M0.md` to `M6.md`.
+Updated: 2026-11-26, M6 Förvaltaren done (tag `m6-fv` pushed), plus Simon's follow-ups (digest count, per-source secret errors), not pushed yet. Reports: `docs/reports/M0.md` to `M6.md`.
 
 ## Where things stand
 - M0 to M3 are done and pushed. M4 is done and tagged `m4`, M5 is done and tagged `m5`. **Everything since cc2c960 is not pushed** (Claude can't push).
@@ -12,7 +12,7 @@ Updated: 2026-11-27, M6 Förvaltaren done (tag `m6-fv` pushed), plus Simon's fol
 2. Check Mina sidor's number against the computed one, and when the daily +1 lands.
 3. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
 4. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`).
-5. **Simon: push** the follow-up commit. On 27 Nov no scheduled run had fired since the evening of 26 Nov (only manual runs): check the Actions tab. The first run on the new code should log `… · fv ok: 17` (or the count then). After you apply for an FV flat: check that "Högst köpoäng" equals your points (the off-by-one risk).
+5. **Simon: push** the follow-up commit. **No scheduled run has fired yet** (checked 26 Nov 21:46 UTC: only the manual runs, the last at 20:48; the 21:07 and 21:37 slots passed). GitHub often takes a while to start the schedule of a newly added workflow; if there's still none by tomorrow morning, check that Actions is enabled and the workflow isn't disabled. The first run on the new code should log `… · fv ok: 17` (or the count then). After you apply for an FV flat: check that "Högst köpoäng" equals your points (the off-by-one risk).
 6. **Next session: M6 SBS** (digest only; plan first, tests first), then Heimstaden (digest only), Wallenstam after 1 Dec, HomeQ (check terms, one POST search).
 
 ## Open for Simon

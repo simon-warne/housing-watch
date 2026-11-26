@@ -165,7 +165,7 @@ def test_digest_fv_section(tmp_path):
         x.startswith("FV Rissne, 1 rum o kokvrå, 5,990 kr") and "early move-in 2027-02-01" in x
         for x in lines
     )
-    # Over-budget 1-room flats are only counted (Simon, 2026-11-27); 2+ rooms are still listed.
+    # Over-budget 1-room flats are only counted (Simon, 2026-11-26); 2+ rooms are still listed.
     assert not any(x.startswith("FV Ursvik") for x in lines)
     assert sum(x.startswith("FV ") and "over budget" in x for x in lines) == 0
     assert "FV Hallonbergen, 3 rum o kök, 8,781 kr · top ? · no detail yet" in lines

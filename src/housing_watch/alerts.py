@@ -662,7 +662,7 @@ def _fv_digest(
     ]
     chance = {FvStatus.WINNABLE, FvStatus.TIED}
     open_chance = sum(1 for v, removed in rows if not removed and v.eligible and v.status in chance)
-    # 1-room flats over budget are only counted (Simon, 2026-11-27); 2+ rooms stay listed.
+    # 1-room flats over budget are only counted (Simon, 2026-11-26); 2+ rooms stay listed.
     over = [p for p in rows if p[0].category != "digest" and p[0].listing.rent > cfg.rent_max]
     listed = [p for p in rows if p not in over]
     shown = sorted(
