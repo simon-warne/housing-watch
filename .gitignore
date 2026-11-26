@@ -1,0 +1,23 @@
+# secrets
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+secrets*
+ntfy_topic*
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# data (location decided in M0)
+*.sqlite
+*.db
+
+# mac / local
+.DS_Store
+.claude/settings.local.json
