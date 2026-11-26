@@ -8,9 +8,11 @@ import yaml
 
 from housing_watch.config import (
     ConfigError,
+    FvPoints,
     load_bf_since,
     load_booked,
     load_config,
+    load_fv_points,
     load_queue_days,
 )
 
@@ -175,3 +177,62 @@ def test_bad_bf_queue_since_raises_without_echo(raw):
     with pytest.raises(ConfigError) as e:
         load_bf_since({"BF_QUEUE_SINCE": raw})
     assert raw not in str(e.value)
+
+
+# --- M6: Förvaltaren ---
+def test_real_config_fv_section():
+    fv = load_config(REAL).fv
+    assert fv.alert_types == ("1 rum o kokvrå", "1 rum o kök")
+    assert fv.digest_types == ("2 rum o kök", "3 rum o kök", "4 rum o kök")
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda d: d.pop("fv"),
+        lambda d: d["fv"].pop("types"),
+        lambda d: d["fv"]["types"].update(alert=[]),
+        lambda d: d["fv"]["types"].update(digest=["1 rum o kök"]),  # both lists
+        lambda d: d["fv"].update(extra=1),
+    ],
+)
+def test_bad_fv_section_raises(tmp_path, edit):
+    data = real_data()
+    edit(data)
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path, data))
+
+
+TODAY = date(2026, 11, 26)
+
+
+def test_fv_points_grow_one_a_day():
+    p = load_fv_points({"FV_POINTS": "1200", "FV_POINTS_ON": "2026-11-20"}, TODAY)
+    assert p == FvPoints(base=1200, base_date=date(2026, 11, 20))
+    assert p.on(date(2026, 11, 20)) == 1200
+    assert p.on(TODAY) == 1206
+
+
+def test_fv_points_unset_is_none():
+    assert load_fv_points({}, TODAY) is None
+    assert load_fv_points({"FV_POINTS": " ", "FV_POINTS_ON": ""}, TODAY) is None
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"FV_POINTS": "1200"},  # no date
+        {"FV_POINTS_ON": "2026-11-20"},  # no points
+        {"FV_POINTS": "12.5", "FV_POINTS_ON": "2026-11-20"},
+        {"FV_POINTS": "-3", "FV_POINTS_ON": "2026-11-20"},
+        {"FV_POINTS": "1200000", "FV_POINTS_ON": "2026-11-20"},
+        {"FV_POINTS": "1200", "FV_POINTS_ON": "20261120"},
+        {"FV_POINTS": "1200", "FV_POINTS_ON": "2026-02-30"},
+        {"FV_POINTS": "1200", "FV_POINTS_ON": "2026-11-27"},  # in the future
+    ],
+)
+def test_bad_fv_points_raise_without_echo(env):
+    with pytest.raises(ConfigError) as e:
+        load_fv_points(env, TODAY)
+    for v in env.values():
+        assert v not in str(e.value)

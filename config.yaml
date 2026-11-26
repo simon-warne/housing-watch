@@ -61,3 +61,11 @@ bf:
     - Djurgården
   # More rooms than this: digest only (as 2+ rooms on SSSB).
   alert_max_rooms: 1.5
+
+# Förvaltaren (M6, Simon 2026-11-26). All of it is Sundbyberg (tier 2): rent up to rent.max, no
+# stretch; same move-in window and last call. Points come from FV_POINTS and FV_POINTS_ON.
+# A listing with a specialContract (e.g. youth or senior) is digest only.
+fv:
+  types:
+    alert: [1 rum o kokvrå, 1 rum o kök]
+    digest: [2 rum o kök, 3 rum o kök, 4 rum o kök]

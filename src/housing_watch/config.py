@@ -40,6 +40,12 @@ class BfConfig:
 
 
 @dataclass(frozen=True)
+class FvConfig:
+    alert_types: tuple[str, ...]
+    digest_types: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Config:
     alert_types: tuple[str, ...]
     digest_types: tuple[str, ...]
@@ -53,6 +59,7 @@ class Config:
     digest_weekday: int  # Monday = 0
     digest_time: time
     bf: BfConfig
+    fv: FvConfig
 
     def tier(self, area: str) -> int:
         """0 = best; unlisted areas rank last (len(area_tiers))."""
@@ -64,6 +71,17 @@ class Config:
 
     def is_stretch(self, area: str) -> bool:
         return area.casefold() in self.stretch_areas
+
+
+@dataclass(frozen=True)
+class FvPoints:
+    """Förvaltaren queue points read on `base_date`; one point a day from then (Simon)."""
+
+    base: int
+    base_date: date
+
+    def on(self, d: date) -> int:
+        return self.base + (d - self.base_date).days
 
 
 @dataclass(frozen=True)
@@ -107,6 +125,15 @@ def _names(v: Any, where: str, *, empty_ok: bool = False) -> tuple[str, ...]:
     return out
 
 
+def _types(v: Any, where: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    types = _keys(v, {"alert", "digest"}, where)
+    alert = _names(types["alert"], f"{where}.alert")
+    digest = _names(types["digest"], f"{where}.digest", empty_ok=True)
+    if {x.casefold() for x in alert} & {x.casefold() for x in digest}:
+        raise ConfigError(f"{where}: a type is in both alert and digest")
+    return alert, digest
+
+
 def load_config(path: str | Path) -> Config:
     try:
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
@@ -121,13 +148,10 @@ def load_config(path: str | Path) -> Config:
         "last_call_hours",
         "digest",
         "bf",
+        "fv",
     }
     d = _keys(raw, top, "config")
-    types = _keys(d["types"], {"alert", "digest"}, "types")
-    alert_types = _names(types["alert"], "types.alert")
-    digest_types = _names(types["digest"], "types.digest", empty_ok=True)
-    if {x.casefold() for x in alert_types} & {x.casefold() for x in digest_types}:
-        raise ConfigError("types: a type is in both alert and digest")
+    alert_types, digest_types = _types(d["types"], "types")
 
     if not isinstance(d["area_tiers"], list) or not d["area_tiers"]:
         raise ConfigError("area_tiers: expected a non-empty list of lists")
@@ -169,6 +193,8 @@ def load_config(path: str | Path) -> Config:
     if isinstance(rooms, bool) or not isinstance(rooms, int | float) or rooms <= 0:
         raise ConfigError("bf.alert_max_rooms: expected a positive number")
 
+    fv_alert, fv_digest = _types(_keys(d["fv"], {"types"}, "fv")["types"], "fv.types")
+
     return Config(
         alert_types=alert_types,
         digest_types=digest_types,
@@ -188,6 +214,7 @@ def load_config(path: str | Path) -> Config:
             tier1=_names(bf["tier1"], "bf.tier1"),
             alert_max_rooms=float(rooms),
         ),
+        fv=FvConfig(alert_types=fv_alert, digest_types=fv_digest),
     )
 
 
@@ -217,6 +244,25 @@ def load_bf_since(env: Mapping[str, str]) -> date | None:
         return date.fromisoformat(raw)
     except ValueError:
         raise ConfigError('BF_QUEUE_SINCE: not "YYYY-MM-DD"') from None
+
+
+def load_fv_points(env: Mapping[str, str], today: date) -> FvPoints | None:
+    """FV_POINTS="<points>", FV_POINTS_ON="YYYY-MM-DD" (secrets). Both unset = no FV alerts."""
+    raw = (env.get("FV_POINTS") or "").strip()
+    on = (env.get("FV_POINTS_ON") or "").strip()
+    if not raw and not on:
+        return None
+    if not re.fullmatch(r"\d{1,6}", raw):
+        raise ConfigError("FV_POINTS: missing or not a whole number (at most 6 digits)")
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", on):
+            raise ValueError
+        base_date = date.fromisoformat(on)
+    except ValueError:
+        raise ConfigError('FV_POINTS_ON: missing or not "YYYY-MM-DD"') from None
+    if base_date > today:
+        raise ConfigError("FV_POINTS_ON is in the future")
+    return FvPoints(base=int(raw), base_date=base_date)
 
 
 def load_booked(env: Mapping[str, str]) -> frozenset[str]:
