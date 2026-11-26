@@ -127,7 +127,10 @@ def _card(href: str, card: str, seen_at: datetime) -> SbsListing:
     rent: list[int] = []
     size: list[int] = []
     rooms: list[str] = []
-    for li in re.findall(r"<li>([^<]*)</li>", card):
+    items = re.findall(r"<li>([^<]*)</li>", card)
+    if len(items) != card.count("<li"):
+        raise ParseError("details", card.count("<li"), nr, why="an item the parser can't read")
+    for li in items:
         v = " ".join(htmllib.unescape(li).replace("\xa0", " ").split())
         if r := _RENT.fullmatch(v):
             rent.append(int(r.group(1).replace(" ", "")))
@@ -141,7 +144,10 @@ def _card(href: str, card: str, seen_at: datetime) -> SbsListing:
         raise ParseError("rent", rent, nr)
     if len(size) > 1 or len(rooms) != 1:
         raise ParseError("details", (size, rooms), nr)
-    labels = tuple(dict.fromkeys(_spans(card, "listing__additional-feature", nr)))
+    found = _spans(card, "listing__additional-feature", nr)
+    if len(found) != card.count('class="listing__additional-feature'):
+        raise ParseError("labels", found, nr, why="a label the parser can't read")
+    labels = tuple(dict.fromkeys(found))
     if "" in labels:
         raise ParseError("labels", labels, nr)
     return SbsListing(
@@ -214,7 +220,9 @@ def allowed(url: str) -> bool:
 
 
 class _ListOnlyRedirects(urllib.request.HTTPRedirectHandler):
-    """Follow a redirect only to another list page; anything else is an error."""
+    """Follow one redirect, and only to another list page; anything else is an error."""
+
+    max_redirections = 1  # no un-paused redirect chains (M6 SBS review)
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         if not allowed(newurl):

@@ -310,3 +310,29 @@ def test_a_redirect_is_followed_only_to_a_list_page():
     assert ok is not None and ok.full_url == page_url(2)
     with pytest.raises(ValueError):
         h.redirect_request(req, None, 301, "Moved", {}, "https://sbsstudent.se/logga-in/")
+
+
+# --- review fixes: nothing on a card may be skipped quietly ---
+
+
+def test_detail_item_with_attributes_raises():
+    page = edited(P2, "<li>16 m²</li>", '<li>16 m²</li><li class="x">Våning 3</li>')
+    with pytest.raises(ParseError):
+        parse_sbs_page(page, SEEN)
+
+
+def test_label_with_nested_markup_raises():
+    page = edited(
+        P2,
+        '<span class="listing__tag is-style-tag"',
+        '<span class="listing__additional-feature is-style-tag"><b>Ny</b></span>'
+        '<span class="listing__tag is-style-tag"',
+    )
+    with pytest.raises(ParseError):
+        parse_sbs_page(page, SEEN)
+
+
+def test_a_redirect_is_followed_at_most_once():
+    from housing_watch.sbs import _ListOnlyRedirects
+
+    assert _ListOnlyRedirects.max_redirections == 1
