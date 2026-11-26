@@ -10,7 +10,15 @@ WF = yaml.safe_load((ROOT / ".github/workflows/watch.yml").read_text(encoding="u
 ON = WF.get("on", WF.get(True))  # PyYAML reads a bare `on:` key as True
 STEPS = WF["jobs"]["watch"]["steps"]
 SECRET = re.compile(r"\$\{\{\s*secrets\.(\w+)\s*\}\}")
-ALLOWED_SECRETS = {"NTFY_TOPIC", "STATE_KEY", "QUEUE_DAYS", "QUEUE_DAYS_UNTIL", "BF_QUEUE_SINCE"}
+ALLOWED_SECRETS = {
+    "NTFY_TOPIC",
+    "STATE_KEY",
+    "QUEUE_DAYS",
+    "QUEUE_DAYS_UNTIL",
+    "BF_QUEUE_SINCE",
+    "FV_POINTS",
+    "FV_POINTS_ON",
+}
 
 
 def _step(name):
@@ -83,3 +91,9 @@ def test_backup_is_weekly_and_keeps_state_encrypted():
 
 def test_watch_step_gets_the_bf_queue_date():
     assert _step("Watch")["env"]["BF_QUEUE_SINCE"] == "${{ secrets.BF_QUEUE_SINCE }}"
+
+
+def test_watch_step_gets_the_fv_points():
+    env = _step("Watch")["env"]
+    assert env["FV_POINTS"] == "${{ secrets.FV_POINTS }}"
+    assert env["FV_POINTS_ON"] == "${{ secrets.FV_POINTS_ON }}"

@@ -1,7 +1,7 @@
 name: watch
-# Every 30 min at odd minutes (GitHub delays or drops top-of-hour runs, M0): fetch SSSB, record
-# history, send alerts (plan M4). The repo and its logs are public: secrets reach only the step
-# that needs them, through env, and the runner prints one fixed line.
+# Every 30 min at odd minutes (GitHub delays or drops top-of-hour runs, M0): fetch SSSB, BF and
+# Förvaltaren, record history, send alerts (plan M4). The repo and its logs are public: secrets
+# reach only the step that needs them, through env, and the runner prints one fixed line.
 on:
   schedule:
     - cron: "7,37 * * * *"
@@ -45,6 +45,8 @@ jobs:
           QUEUE_DAYS: ${{ secrets.QUEUE_DAYS }}
           QUEUE_DAYS_UNTIL: ${{ secrets.QUEUE_DAYS_UNTIL }}
           BF_QUEUE_SINCE: ${{ secrets.BF_QUEUE_SINCE }}
+          FV_POINTS: ${{ secrets.FV_POINTS }}
+          FV_POINTS_ON: ${{ secrets.FV_POINTS_ON }}
           BOOKED_IDS: ${{ vars.BOOKED_IDS }}
           INIT: ${{ steps.data.outputs.init }}
         run: uv run --no-dev python -m housing_watch.run --data data ${INIT:+--init}
