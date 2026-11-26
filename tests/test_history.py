@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from housing_watch.history import Changes, deadline, latest, open_db, record
+from housing_watch.history import SCHEMA_VERSION, Changes, deadline, latest, open_db, record
 from housing_watch.sssb import Detail, load_jsonp, parse_detail, parse_list
 
 FIX = Path(__file__).parent / "fixtures"
@@ -199,7 +199,7 @@ def test_open_db_keeps_existing_data(tmp_path, listings):
     conn.close()
     conn = open_db(path)
     assert count(conn, "observations") == 24
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     conn.close()
 
 
@@ -207,7 +207,14 @@ def test_history_db_has_no_alerts_table(db):
     # The history DB is public; alerts live in state.db (plan M3).
     _, conn = db
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert tables == {"listings", "observations", "bf_listings", "bf_observations"}
+    assert tables == {
+        "listings",
+        "observations",
+        "bf_listings",
+        "bf_observations",
+        "fv_listings",
+        "fv_observations",
+    }
 
 
 # Review fixes

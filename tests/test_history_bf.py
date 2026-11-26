@@ -9,6 +9,7 @@ import pytest
 
 from housing_watch.bf import BfDetail, parse_bf_list
 from housing_watch.history import (
+    SCHEMA_VERSION,
     bf_active,
     bf_detail,
     bf_record,
@@ -143,6 +144,8 @@ def test_v1_db_migrates_in_place_and_keeps_sssb_rows(tmp_path):
     sssb = parse_list(load_jsonp((FIX / "2026-11-26-list.jsonp").read_text("utf-8")), T0)
     c = open_db(path)
     record(c, sssb, {}, T0)
+    c.execute("DROP TABLE fv_observations")
+    c.execute("DROP TABLE fv_listings")
     c.execute("DROP TABLE bf_observations")
     c.execute("DROP TABLE bf_listings")
     c.execute("PRAGMA user_version = 1")
@@ -155,7 +158,7 @@ def test_v1_db_migrates_in_place_and_keeps_sssb_rows(tmp_path):
     assert tables == V1_SCHEMA_TABLES
 
     c = open_db(path)
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert c.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert [tuple(r) for r in c.execute("SELECT * FROM observations ORDER BY id")] == [
         tuple(r) for r in rows
     ]

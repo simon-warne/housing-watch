@@ -379,7 +379,14 @@ def test_history_db_holds_no_alerts(hist, state, tmp_path):
     alerts.append(digest_alert(hist, CFG, Q, frozenset({FORUM}), SUNDAY_18))
     dispatch(state, alerts, phone, T0)
     tables = {r[0] for r in hist.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert tables == {"listings", "observations", "bf_listings", "bf_observations"}
+    assert tables == {
+        "listings",
+        "observations",
+        "bf_listings",
+        "bf_observations",
+        "fv_listings",
+        "fv_observations",
+    }
     raw = (tmp_path / "history.sqlite").read_bytes()
     assert b"you have" not in raw and b"Winnable" not in raw
     assert state.execute("SELECT COUNT(*) FROM alerts").fetchone()[0] == len(phone.got) == 8
