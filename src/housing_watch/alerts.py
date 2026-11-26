@@ -11,18 +11,37 @@ import sqlite3
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from housing_watch.bf import BASE as BF_BASE
+from housing_watch.bf import BfListing, bf_deadline
 from housing_watch.config import Config, QueueDays
-from housing_watch.history import active, seen_since
-from housing_watch.rules import Status, Verdict, classify, rank_key
+from housing_watch.history import active, bf_active, bf_seen_since, seen_since
+from housing_watch.rules import (
+    CHANCE,
+    BfStatus,
+    BfVerdict,
+    Status,
+    Verdict,
+    bf_classify,
+    bf_rank_key,
+    classify,
+    rank_key,
+)
 from housing_watch.sssb import STOCKHOLM, Listing
 
 GRACE = timedelta(minutes=30)  # a late GitHub run still gets the last call
 DIGEST_CATCH_UP = timedelta(hours=24)
 NTFY_BODY_MAX = 3900  # ntfy's message limit is 4096 bytes
-ORDER = {"last_call": 0, "lead_lost": 1, "winnable": 2, "heartbeat": 3, "digest": 4}
+ORDER = {
+    "last_call": 0,
+    "lead_lost": 1,
+    "winnable": 2,
+    "first_come": 2,
+    "heartbeat": 3,
+    "digest": 4,
+}
 
 STATE_VERSION = 1
 STATE_SCHEMA = """
@@ -46,7 +65,7 @@ CREATE TABLE IF NOT EXISTS meta (
 
 @dataclass(frozen=True)
 class Alert:
-    kind: str  # last_call | lead_lost | winnable | heartbeat | digest
+    kind: str  # last_call | lead_lost | winnable | first_come | heartbeat | digest
     listing_id: str | None
     state_key: str  # with kind and listing_id: one alert per listing and state
     priority: str  # urgent | high | low
@@ -228,8 +247,12 @@ def digest_alert(
     queue: QueueDays,
     booked: frozenset[str],
     now: datetime,
+    bf_since: date | None = None,
 ) -> Alert | None:
-    """The weekly digest, due from the digest time until 24 h later (catch-up for late runs)."""
+    """The weekly digest, due from the digest time until 24 h later (catch-up for late runs).
+
+    BF listings in scope of a watched type get their own summary lines and listing lines
+    (after SSSB's); without any, the digest is SSSB only."""
     moment = _digest_moment(cfg, now)
     if now.astimezone(UTC) - moment.astimezone(UTC) > DIGEST_CATCH_UP:
         return None
@@ -261,6 +284,9 @@ def digest_alert(
     if late:
         lines.append(f"{late} more after the move-in window")
     rest = [_digest_line(v, removed, booked, cfg) for v, removed in shown]
+    bf_head, bf_lines, bf_title = _bf_digest(hist, cfg, bf_since, since)
+    lines += bf_head
+    rest += bf_lines
     while rest:
         line = rest.pop(0)
         more = f"+{len(rest) + 1} more"
@@ -274,7 +300,7 @@ def digest_alert(
         listing_id=None,
         state_key=f"{week.year}-W{week.week:02d}",
         priority="low",
-        title=f"Weekly digest, week {week.week}: {len(rows)} seen, {open_ahead} winnable",
+        title=f"Weekly digest, week {week.week}: {len(rows)} seen, {open_ahead} winnable{bf_title}",
         body="\n".join(lines),
         url=None,
     )
@@ -296,24 +322,204 @@ def _digest_line(v: Verdict, removed: datetime | None, booked: frozenset[str], c
     return f"{x.area}, {kind}, {_kr(x.rent)} · top {top} · {', '.join(tags)}"
 
 
+# --- Bostadsförmedlingen (M5 part B) ---
+def _bf_kind(x: BfListing) -> str:
+    return "Bostad snabbt" if x.bostad_snabbt else x.type
+
+
+def _bf_head(x: BfListing) -> str:
+    rent = _kr(x.rent) if x.rent is not None else "rent unknown"
+    return f"{x.district}, {_bf_kind(x)}, {rent}"
+
+
+def _bf_where(x: BfListing) -> str:
+    return x.address + (f", {_floor(x.floor)}" if x.floor is not None else "")
+
+
+def _bf_marks(v: BfVerdict) -> str:
+    m = [
+        s
+        for s, on in (
+            ("tied", v.status == BfStatus.TIED),
+            ("no applicants shown", v.status == BfStatus.NO_APPLICANTS_SHOWN),
+            ("over budget", v.over_budget),
+        )
+        if on
+    ]
+    return f" ({', '.join(m)})" if m else ""
+
+
+def _day(d: date) -> str:
+    return f"{d:%a} {d.day} {d:%b}"
+
+
+def _bf_lines(v: BfVerdict, since: date) -> list[str]:
+    x, d = v.listing, v.detail
+    lines = [f"{x.district} · {_bf_where(x)}", f"{_kr(x.rent)}/month · move-in {d.move_in}"]
+    if v.status == BfStatus.FIRST_COME:
+        lines.append("Bostad snabbt: first come, queue time not needed · apply early")
+    elif d.top_dates:
+        lines.append(f"Top queue since {min(d.top_dates)} vs yours {since}")
+    else:
+        lines.append(f"No applicants shown · yours {since}")
+    lines.append(f"Apply by {_day(x.deadline)}")
+    return lines
+
+
+def _bf_alert(v: BfVerdict, since: date, now: datetime, window: timedelta) -> Alert | None:
+    x, d = v.listing, v.detail
+    dl = bf_deadline(x.deadline)
+    if dl <= now:
+        return None
+    url = BF_BASE + x.url
+    lid = f"bf:{x.id}"
+    if v.status == BfStatus.FIRST_COME:
+        return Alert(
+            kind="first_come",
+            listing_id=lid,
+            state_key=f"first@{x.advertised_from.isoformat()}",
+            priority="high",
+            title=f"BF · First come{_bf_marks(v)}: {_bf_head(x)}",
+            body="\n".join(_bf_lines(v, since)),
+            url=url,
+        )
+    if dl - now <= window:
+        local, today = dl.astimezone(STOCKHOLM), now.astimezone(STOCKHOLM).date()
+        day = "today" if local.date() == today else _day(local.date())
+        if not d.top_dates:
+            lead = f"no applicants shown, yours {since}"
+        else:
+            word = "tied" if v.status == BfStatus.TIED else "you lead"
+            lead = f"{word}: yours {since} vs top {min(d.top_dates)}"
+        return Alert(
+            kind="last_call",
+            listing_id=lid,
+            state_key=dl.astimezone(UTC).isoformat(),
+            priority="urgent",
+            title=f"BF · LAST CALL, closes {local:%H:%M}{_bf_marks(v)}: {_bf_head(x)}",
+            body=f"Closes {local:%H:%M} {day} (in {_left(dl - now)}) · {lead}\n"
+            f"{_bf_where(x)} · move-in {d.move_in}",
+            url=url,
+        )
+    if v.status == BfStatus.NO_APPLICANTS_SHOWN:
+        return None  # last call only (Simon, 2026-11-26)
+    return Alert(
+        kind="winnable",
+        listing_id=lid,
+        state_key=f"{v.status}@{x.advertised_from.isoformat()}",
+        priority="high",
+        title=f"BF · Winnable{_bf_marks(v)}: {_bf_head(x)}",
+        body="\n".join(_bf_lines(v, since)),
+        url=url,
+    )
+
+
+def bf_listing_alerts(
+    hist: sqlite3.Connection,
+    cfg: Config,
+    since: date | None,
+    fresh: frozenset[str],
+    now: datetime,
+) -> list[Alert]:
+    """BF winnable, last call and first come, urgent first, then by rank.
+
+    Only listings whose detail page was fetched this run (`fresh`): the BF list has no top
+    figure, so an older detail could be stale. No queue date (secret unset) → no alerts."""
+    if now.tzinfo is None:
+        raise ValueError("now must be tz-aware")
+    if since is None:
+        return []
+    window = timedelta(hours=cfg.last_call_hours) + GRACE
+    out: list[tuple[tuple, Alert]] = []
+    for x, d in bf_active(hist):
+        if x.id not in fresh or d is None:
+            continue
+        v = bf_classify(x, d, cfg, since)
+        if not (v.eligible and v.status in CHANCE):
+            continue
+        a = _bf_alert(v, since, now, window)
+        if a:
+            out.append((bf_rank_key(v), a))
+    out.sort(key=lambda p: (ORDER[p[1].kind], p[0]))
+    return [a for _, a in out]
+
+
+def _bf_digest(
+    hist: sqlite3.Connection, cfg: Config, since: date | None, week_start: datetime
+) -> tuple[list[str], list[str], str]:
+    """(summary lines, listing lines, title suffix) for the digest; empty without BF rows."""
+    rows = [
+        (v, removed)
+        for x, d, removed in bf_seen_since(hist, week_start)
+        if (v := bf_classify(x, d, cfg, since)).tier is not None and v.category != "other"
+    ]
+    if not rows:
+        return [], [], ""
+    winning: dict[tuple[int, str], list[date]] = defaultdict(list)
+    for v, removed in rows:
+        if removed and v.category == "alert" and v.detail and v.detail.top_dates:
+            winning[(v.tier, v.listing.district)].append(min(v.detail.top_dates))
+    ranges = [
+        f"{a} {min(d)}–{max(d)}" if min(d) != max(d) else f"{a} {d[0]}"
+        for (_, a), d in sorted(winning.items())
+    ]
+    chance = {BfStatus.WINNABLE, BfStatus.TIED, BfStatus.FIRST_COME}
+    open_chance = sum(1 for v, removed in rows if not removed and v.eligible and v.status in chance)
+    shown = sorted(
+        (p for p in rows if p[0].detail is None or p[0].detail.move_in <= cfg.move_in_to),
+        key=lambda p: (not p[0].in_window, bf_rank_key(p[0])),
+    )
+    late = len(rows) - len(shown)
+    head = [
+        f"BF: {len(rows)} seen, {open_chance} winnable"
+        + (f", {late} after the window" if late else "")
+    ]
+    head.append("BF winning dates: " + (" · ".join(ranges) or "none closed this week"))
+    lines = [_bf_digest_line(v, removed, cfg) for v, removed in shown]
+    return head, lines, f" · BF {len(rows)} seen, {open_chance} winnable"
+
+
+def _bf_digest_line(v: BfVerdict, removed: datetime | None, cfg: Config) -> str:
+    x, d = v.listing, v.detail
+    tags = [str(v.status)]
+    if x.rent is not None and x.rent > cfg.rent_max and v.category == "alert":
+        tags.append("over budget")
+    if removed:
+        tags.append("closed")
+    if d and d.move_in < cfg.move_in_from:
+        tags.append(f"early move-in {d.move_in.isoformat()}")
+    top = (min(d.top_dates).isoformat() if d.top_dates else "none") if d else "?"
+    return f"BF {_bf_head(x)} · top {top} · {', '.join(tags)}"
+
+
 # --- heartbeat (failure streak in state.db meta) ---
 def _meta(state: sqlite3.Connection, key: str) -> str | None:
     row = state.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else None
 
 
-def run_failed(state: sqlite3.Connection, now: datetime, error: str) -> Alert | None:
-    """Count a failed or 0-listing run; from the 3rd in a row, return the heartbeat alert."""
+def _keys(source: str) -> tuple[str, str, str]:
+    p = f"{source}_" if source else ""
+    return f"{p}fail_count", f"{p}fail_since", f"{p}last_error"
+
+
+def run_failed(
+    state: sqlite3.Connection, now: datetime, error: str, *, source: str = ""
+) -> Alert | None:
+    """Count a failed or 0-listing run; from the 3rd in a row, return the heartbeat alert.
+
+    `source="bf"` keeps Bostadsförmedlingen's streak apart from SSSB's (M5)."""
     if now.tzinfo is None:
         raise ValueError("now must be tz-aware")
-    count = int(_meta(state, "fail_count") or 0) + 1
-    since = _meta(state, "fail_since") if count > 1 else None
+    k_count, k_since, k_error = _keys(source)
+    count = int(_meta(state, k_count) or 0) + 1
+    since = _meta(state, k_since) if count > 1 else None
     since = since or now.astimezone(UTC).isoformat()
     with state:
         state.executemany(
             "INSERT INTO meta (key, value) VALUES (?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            [("fail_count", str(count)), ("fail_since", since), ("last_error", error[:1000])],
+            [(k_count, str(count)), (k_since, since), (k_error, error[:1000])],
         )
     if count < 3:
         return None
@@ -323,21 +529,20 @@ def run_failed(state: sqlite3.Connection, now: datetime, error: str) -> Alert | 
     return Alert(
         kind="heartbeat",
         listing_id=None,
-        state_key=since,
+        state_key=f"{source}@{since}" if source else since,
         priority="high",
-        title=f"housing-watch: {count} failed runs since {at}",
+        title=f"{'BF' if source == 'bf' else 'housing-watch'}: {count} failed runs since {at}",
         body=f"Last error: {error[:1000]}",
         url=None,
     )
 
 
-def run_ok(state: sqlite3.Connection) -> None:
+def run_ok(state: sqlite3.Connection, *, source: str = "") -> None:
     """A good run ends the streak. Writes nothing if there was none."""
-    if _meta(state, "fail_count") is not None:
+    keys = _keys(source)
+    if _meta(state, keys[0]) is not None:
         with state:
-            state.execute(
-                "DELETE FROM meta WHERE key IN ('fail_count', 'fail_since', 'last_error')"
-            )
+            state.execute("DELETE FROM meta WHERE key IN (?, ?, ?)", keys)
 
 
 # --- sending ---
