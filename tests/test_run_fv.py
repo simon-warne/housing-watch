@@ -205,10 +205,20 @@ def test_no_points_records_but_does_not_alert(tmp_path, sssb, fv):
 @pytest.mark.parametrize(
     "bad", [{"FV_POINTS": "many"}, {"FV_POINTS_ON": "2026-12-01"}, {"FV_POINTS_ON": ""}]
 )
-def test_bad_points_stop_before_any_request(tmp_path, sssb, fv, bad):
-    with pytest.raises(Exception, match="FV_POINTS"):
-        go(tmp_path, sssb, fv, T0, env={**ENV_FV, **bad})
-    assert sssb.calls == [] and fv.calls == []
+def test_bad_points_stop_only_fv_and_leave_a_note(tmp_path, sssb, fv, bad, capsys):
+    """Simon, 2026-11-27: a bad FV secret stops FV's part only, with a note on the phone."""
+    rc, phone, _ = go(tmp_path, sssb, fv, T0, env={**ENV_FV, **bad})
+    assert rc == 1 and fv.calls == [] and sssb.calls  # SSSB still ran
+    assert capsys.readouterr().out.strip() == "ok: 24 listings · fv failed: ConfigError"
+    [note] = [a for a in phone.got if a.kind == "setup"]
+    assert note.title == "FV: setup problem, not watching" and "FV_POINTS" in note.body
+    for v in bad.values():
+        assert not v or v not in note.body  # never echoes the secret
+    assert len(phone.got) == 7  # SSSB's 6 winnable + the note
+    _, again, _ = go(tmp_path, sssb, fv, T0 + timedelta(minutes=30), env={**ENV_FV, **bad})
+    assert [a for a in again.got if a.kind == "setup"] == []  # one note per problem
+    _, later, _ = go(tmp_path, sssb, fv, T0 + timedelta(minutes=60), env={**ENV_FV, **bad})
+    assert not any(a.kind == "heartbeat" for a in later.got)  # the note is enough
 
 
 def test_digest_has_this_runs_fv(tmp_path, sssb, fv):

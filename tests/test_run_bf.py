@@ -231,10 +231,14 @@ def test_no_queue_date_records_but_does_not_alert(tmp_path, sssb, bf):
     assert rc == 0 and bf_ids(phone) == [] and len(bf.detail_calls()) == 1
 
 
-def test_bad_queue_date_stops_before_any_request(tmp_path, sssb, bf):
-    with pytest.raises(Exception, match="BF_QUEUE_SINCE"):
-        go(tmp_path, sssb, bf, T0, env={**ENV_BF, "BF_QUEUE_SINCE": "soon"})
-    assert sssb.calls == [] and bf.calls == []
+def test_bad_queue_date_stops_only_bf_and_leaves_a_note(tmp_path, sssb, bf, capsys):
+    """Simon, 2026-11-27: a bad BF secret stops BF's part only, with a note on the phone."""
+    rc, phone, _ = go(tmp_path, sssb, bf, T0, env={**ENV_BF, "BF_QUEUE_SINCE": "soon"})
+    assert rc == 1 and bf.calls == [] and sssb.calls
+    assert capsys.readouterr().out.strip() == "ok: 24 listings · bf failed: ConfigError"
+    [note] = [a for a in phone.got if a.kind == "setup"]
+    assert note.title == "BF: setup problem, not watching"
+    assert "BF_QUEUE_SINCE" in note.body and "soon" not in note.body
 
 
 def _trace(tmp_path, env):

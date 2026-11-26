@@ -433,3 +433,20 @@ def test_state_size_does_not_change_when_alerts_are_logged(tmp_path, sssb):
     _, phone, _ = go(tmp_path, sssb, T0 + timedelta(minutes=30))
     assert len(phone.got) == 24
     assert len((tmp_path / "state.db.enc").read_bytes()) == before
+
+
+def test_bad_sssb_queue_days_still_stop_the_whole_run(tmp_path):
+    """Simon, 2026-11-27: only per-source secrets stop just their source; QUEUE_DAYS is
+    needed by SSSB and the digest, so it still stops everything before any request."""
+    sssb = FakeSSSB()
+    with pytest.raises(Exception, match="QUEUE_DAYS"):
+        run(
+            tmp_path,
+            {**ENV, "QUEUE_DAYS": "x"},
+            get=sssb,
+            send=Phone(),
+            sleep=Clock(),
+            now=T0,
+            init=True,
+        )
+    assert sssb.calls == []

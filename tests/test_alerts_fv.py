@@ -159,13 +159,16 @@ def test_digest_fv_section(tmp_path):
     d = digest_alert(conn, CFG, Q, frozenset(), SUNDAY_18, fv_points=PTS)
     lines = d.body.splitlines()
     assert "FV 17 seen, 1 winnable" in d.title
-    assert "FV: 17 seen, 1 winnable" in lines
+    assert "FV: 17 seen, 1 winnable, 10 over budget (not listed)" in lines
     assert "FV Duvbo, 1 rum o kokvrå, 4,290 kr · top 3000 · winnable" in lines
     assert any(
         x.startswith("FV Rissne, 1 rum o kokvrå, 5,990 kr") and "early move-in 2027-02-01" in x
         for x in lines
     )
-    assert any(x.startswith("FV Ursvik, 1 rum o kök, 10,113 kr · top ? ") for x in lines)
+    # Over-budget 1-room flats are only counted (Simon, 2026-11-27); 2+ rooms are still listed.
+    assert not any(x.startswith("FV Ursvik") for x in lines)
+    assert sum(x.startswith("FV ") and "over budget" in x for x in lines) == 0
+    assert "FV Hallonbergen, 3 rum o kök, 8,781 kr · top ? · no detail yet" in lines
 
 
 def test_digest_without_fv_rows_has_no_fv_section(tmp_path):

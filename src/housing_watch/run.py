@@ -38,6 +38,7 @@ from housing_watch.alerts import (
     open_state,
     run_failed,
     run_ok,
+    setup_note,
 )
 from housing_watch.bf import (
     BfDetail,
@@ -48,6 +49,7 @@ from housing_watch.bf import (
     parse_bf_list,
 )
 from housing_watch.config import (
+    ConfigError,
     QueueDays,
     load_bf_since,
     load_booked,
@@ -300,6 +302,20 @@ def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, l
     return len(listings), listing_alerts(hist, cfg, queue, booked, now)
 
 
+def _secret(load: Callable[[], object]) -> tuple[object, ConfigError | None]:
+    try:
+        return load(), None
+    except ConfigError as e:
+        return None, e
+
+
+def _ok(value, err: ConfigError | None):
+    """The secret's value inside a source's part; its load error fails only that part."""
+    if err is not None:
+        raise err
+    return value
+
+
 def _test_alert(now: datetime) -> Alert:
     return Alert(
         kind="test",
@@ -331,8 +347,10 @@ def run(
     `bf_get` fetches Bostadsförmedlingen and `fv_get` Förvaltaren; None leaves that source
     out (tests of one source).
 
-    Setup problems (config, secrets, key, missing or unexpected files, a shrinking history)
-    raise instead, before `ready` exists, so nothing is pushed.
+    Setup problems (config, QUEUE_DAYS, key, missing or unexpected files, a shrinking
+    history) raise instead, before `ready` exists, so nothing is pushed. A bad per-source
+    secret (BF_QUEUE_SINCE, FV_POINTS/FV_POINTS_ON) fails only that source's part, with one
+    `setup` note per problem.
     """
     if now.tzinfo is None:
         raise ValueError("now must be tz-aware")
@@ -344,8 +362,10 @@ def run(
     cfg = load_config(config)
     queue = load_queue_days(env)
     booked = load_booked(env)
-    bf_since = load_bf_since(env)
-    fv_points = load_fv_points(env, now.astimezone(STOCKHOLM).date())
+    # Per-source secrets: a bad one stops only that source's part, with a note (Simon,
+    # 2026-11-27). QUEUE_DAYS and STATE_KEY are needed by everything, so they raise here.
+    bf_since, bf_err = _secret(lambda: load_bf_since(env))
+    fv_points, fv_err = _secret(lambda: load_fv_points(env, now.astimezone(STOCKHOLM).date()))
     key = env.get("STATE_KEY")
     encrypt(b"", key)  # a bad key fails here, before any request
 
@@ -383,6 +403,10 @@ def run(
                     alerts.extend(found)
                     parts.append(f"{label}ok: {n}" + ("" if name else " listings"))
                     ok.append(name)
+                except ConfigError as e:  # a bad secret: one note, no heartbeat streak
+                    failures.append(e)
+                    alerts.append(setup_note(name, str(e)))
+                    parts.append(f"{label}failed: ConfigError")
                 except Exception as e:  # noqa: BLE001 - every failure feeds the heartbeat
                     if isinstance(e, PartialRun):
                         alerts.extend(e.alerts)
@@ -403,14 +427,14 @@ def run(
                     "bf",
                     "bf_last_fetch",
                     "bf ",
-                    lambda: _watch_bf(hist, cfg, bf_since, now, bf_get, sleep),
+                    lambda: _watch_bf(hist, cfg, _ok(bf_since, bf_err), now, bf_get, sleep),
                 )
             if fv_get is not None:
                 part(
                     "fv",
                     "fv_last_fetch",
                     "fv ",
-                    lambda: _watch_fv(hist, cfg, fv_points, state, now, fv_get, sleep),
+                    lambda: _watch_fv(hist, cfg, _ok(fv_points, fv_err), state, now, fv_get, sleep),
                 )
             if ok:  # after every part, so it has this run's data and survives either failing
                 try:

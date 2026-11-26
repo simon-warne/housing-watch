@@ -54,6 +54,7 @@ ORDER = {
     "winnable": 2,
     "first_come": 2,
     "heartbeat": 3,
+    "setup": 3,
     "digest": 4,
 }
 
@@ -661,14 +662,18 @@ def _fv_digest(
     ]
     chance = {FvStatus.WINNABLE, FvStatus.TIED}
     open_chance = sum(1 for v, removed in rows if not removed and v.eligible and v.status in chance)
+    # 1-room flats over budget are only counted (Simon, 2026-11-27); 2+ rooms stay listed.
+    over = [p for p in rows if p[0].category != "digest" and p[0].listing.rent > cfg.rent_max]
+    listed = [p for p in rows if p not in over]
     shown = sorted(
-        (p for p in rows if p[0].detail is None or p[0].detail.move_in <= cfg.move_in_to),
+        (p for p in listed if p[0].detail is None or p[0].detail.move_in <= cfg.move_in_to),
         key=lambda p: (not p[0].in_window, p[0].category != "alert", fv_rank_key(p[0])),
     )
-    late = len(rows) - len(shown)
+    late = len(listed) - len(shown)
     head = [
         f"FV: {len(rows)} seen, {open_chance} winnable"
-        + (f", {late} after the window" if late else ""),
+        + (f", {late} after the window" if late else "")
+        + (f", {len(over)} over budget (not listed)" if over else ""),
         "FV winning points: " + (" · ".join(ranges) or "none closed this week"),
     ]
     lines = [_fv_digest_line(v, removed, cfg) for v, removed in shown]
@@ -735,6 +740,22 @@ def run_failed(
         priority="high",
         title=f"{SOURCE_NAMES.get(source, 'housing-watch')}: {count} failed runs since {at}",
         body=f"Last error: {error[:1000]}",
+        url=None,
+    )
+
+
+def setup_note(source: str, error: str) -> Alert:
+    """A bad or half-set secret for one source: that source is skipped until it is fixed.
+    Sent once per distinct problem (the message never holds the secret's value)."""
+    name = SOURCE_NAMES.get(source, "housing-watch")
+    return Alert(
+        kind="setup",
+        listing_id=None,
+        state_key=f"{source}:{error}",
+        priority="high",
+        title=f"{name}: setup problem, not watching",
+        body=f"{error}. Fix the GitHub secret; {name} is skipped until then "
+        "(the other sources still run).",
         url=None,
     )
 
