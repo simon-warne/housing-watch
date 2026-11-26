@@ -1,21 +1,21 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-26, M5 part A (reconnaissance) done, stopped for Simon. Reports: `docs/reports/M0.md` to `M5.md`.
+Updated: 2026-11-26, M5 done (part B code, review, report), tagged `m5`. Reports: `docs/reports/M0.md` to `M5.md`.
 
 ## Where things stand
-- M0 to M3 are done and pushed. The rewritten history (queue days redacted) is force-pushed: `main` and the tags match GitHub.
-- Move-in window is now 2027-04-01 to 2027-10-31; earlier move-ins are listed in the weekly digest (commit cc2c960). 272 tests pass. **Not pushed.**
-- M5 part A done: BF serves all listings in one logged-out JSON (`/AllaAnnonser/`); detail pages show move-in, deadline and the top-3 applicants' queue start dates. Fixtures in `tests/fixtures/bf/`. Simon answered the three questions (logged); part B is next, using the BF area list in `docs/reports/M5.md` (Stockholm city, Solna, Sundbyberg only).
-- M4 code is done and tagged `m4`: `run.py`, `ntfy.py`, `crypto.py`, `watch.yml`, `scripts/{fetch,push}-data.sh`, `gaps.sh`. 271 tests pass. The review's two privacy leaks are fixed (requests use public facts only; state is padded).
+- M0 to M3 are done and pushed. M4 is done and tagged `m4`, M5 is done and tagged `m5`. **Everything since cc2c960 is not pushed** (Claude can't push).
+- M5: Bostadsförmedlingen runs in the same scheduled run after SSSB, with its own guard and heartbeat. BF alerts are tagged "BF ·" and the weekly digest has a BF section. 408 tests pass.
+- With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-1. Simon: add the secrets `STATE_KEY` (command in `docs/reports/M4.md`), `QUEUE_DAYS` and `QUEUE_DAYS_UNTIL`, plus the variable `BOOKED_IDS`. Push `main` and `m4`. Then run **watch** with `test_alert` (phone check), then one normal run (it creates the `data` branch).
+1. Simon: add the secrets `STATE_KEY` (command in `docs/reports/M4.md`), `QUEUE_DAYS`, `QUEUE_DAYS_UNTIL` and `BF_QUEUE_SINCE` (`YYYY-MM-DD`), plus the variable `BOOKED_IDS`. Push `main` with `--tags`. Then run **watch** with `test_alert` (phone check), then one normal run (it creates the `data` branch).
 2. Check Mina sidor's number against the computed one, and when the daily +1 lands.
-3. After a week: `scripts/gaps.sh 7`, look for false alerts, and tick M4's acceptance in the report.
-4. M5 part B in a fresh session: plan first (plan: `docs/plans/M5.md`; commute list and answers in `docs/reports/M5.md`). Simon adds `BF_QUEUE_SINCE`.
+3. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
+4. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`).
 
 ## Open for Simon
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.
-- Detail cap of 10: with more than 10 listings closing within 48 h, each gets a live figure every other run. Raise the cap?
+- Detail cap of 10 (per source): raise it? BF listings closing tonight take most of the 10 slots until they close.
+- BF lines in the digest get cut off when about 100 BF rows are in scope (backlog: only listings with a chance, or a separate BF digest).
 
 ## Gotchas learned
 - BF: `Inflyttningsdatum` is null in the list (move-in only on the detail page, sometimes as text); deadline is a date without a time; no robots.txt.
@@ -31,3 +31,6 @@ Updated: 2026-11-26, M5 part A (reconnaissance) done, stopped for Simon. Reports
 - **Public signals leak too:** which listings get requests, the step's run time, and file sizes. Anything that varies with my days or bookings must not reach public history, logs or timing (`test_public_traces_do_not_depend_on_queue_days_or_bookings`).
 - A size test needs enough alerts to grow SQLite pages, or it passes without padding.
 - PyYAML reads a bare `on:` key as `True`.
+- BF: the detail page has no listing id (it's matched by address and Lägenhetsnummer). The deadline comes from the list (`AnnonseradTill`). Bostad snabbt is a flag on ordinary `Hyresrätt` listings.
+- BF alerts need a detail page fetched in this run (`fresh`): a stored page can be days old.
+- The shrink guard compares each observation table separately: one source's growth can hide the other's loss.
