@@ -7,8 +7,10 @@ and a winnable or tied status).
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 
+from housing_watch.bf import BfDetail, BfListing
 from housing_watch.config import Config
 from housing_watch.sssb import Listing
 
@@ -77,3 +79,98 @@ def rank_key(v: Verdict) -> tuple:
 def ranked(verdicts: Iterable[Verdict]) -> list[Verdict]:
     """Best first: area tier, then ground floor last, then lower rent."""
     return sorted(verdicts, key=rank_key)
+
+
+# --- Bostadsförmedlingen (M5 part B) ---
+class BfStatus(StrEnum):
+    WINNABLE = "winnable"  # my queue start is earlier than the top applicant's
+    TIED = "tied"  # same date: whoever applied first wins
+    BEHIND = "behind"
+    NO_APPLICANTS_SHOWN = "no applicants shown"  # no top-3 block: last call only (Simon)
+    FIRST_COME = "first come"  # Bostad snabbt
+    PENDING = "no detail yet"
+    NO_QUEUE_DATE = "no BF queue date set"
+
+
+def bf_status(top_dates: tuple[date, ...], since: date | None) -> BfStatus:
+    if since is None:
+        return BfStatus.NO_QUEUE_DATE
+    if not top_dates:
+        return BfStatus.NO_APPLICANTS_SHOWN
+    top = min(top_dates)
+    if since < top:
+        return BfStatus.WINNABLE
+    return BfStatus.TIED if since == top else BfStatus.BEHIND
+
+
+CHANCE = {BfStatus.WINNABLE, BfStatus.TIED, BfStatus.NO_APPLICANTS_SHOWN, BfStatus.FIRST_COME}
+
+
+def bf_category(x: BfListing, cfg: Config) -> str:
+    """'alert' (watched type, few rooms), 'digest' (watched, more rooms) or 'other'."""
+    watched = (x.bostad_snabbt and cfg.bf.bostad_snabbt) or x.type.casefold() in (
+        t.casefold() for t in cfg.bf.types
+    )
+    if not watched:
+        return "other"
+    return "alert" if x.rooms <= cfg.bf.alert_max_rooms else "digest"
+
+
+def bf_worth_details(x: BfListing, cfg: Config) -> bool:
+    """Could alert for *someone*: public facts only (type, scope, rooms, rent), never my date."""
+    tier = cfg.bf.tier(x.municipality, x.district)
+    if tier is None or x.rent is None or bf_category(x, cfg) != "alert":
+        return False
+    return x.rent <= cfg.rent_max or (tier == 0 and x.rent <= cfg.rent_stretch)
+
+
+@dataclass(frozen=True)
+class BfVerdict:
+    listing: BfListing
+    detail: BfDetail | None
+    status: BfStatus
+    category: str
+    tier: int | None  # None = out of scope
+    in_window: bool | None  # None = move-in not known yet
+    eligible: bool
+    over_budget: bool
+
+
+def bf_classify(x: BfListing, d: BfDetail | None, cfg: Config, since: date | None) -> BfVerdict:
+    if d is None:
+        st = BfStatus.PENDING
+    elif x.bostad_snabbt and cfg.bf.bostad_snabbt:
+        st = BfStatus.FIRST_COME
+    else:
+        st = bf_status(d.top_dates, since)
+    tier = cfg.bf.tier(x.municipality, x.district)
+    category = bf_category(x, cfg)
+    in_window = None if d is None else cfg.move_in_from <= d.move_in <= cfg.move_in_to
+    within = x.rent is not None and x.rent <= cfg.rent_max
+    stretch = (
+        x.rent is not None
+        and cfg.rent_max < x.rent <= cfg.rent_stretch
+        and tier == 0
+        and st in CHANCE
+    )
+    eligible = tier is not None and category == "alert" and bool(in_window) and (within or stretch)
+    return BfVerdict(
+        listing=x,
+        detail=d,
+        status=st,
+        category=category,
+        tier=tier,
+        in_window=in_window,
+        eligible=eligible,
+        over_budget=eligible and stretch,
+    )
+
+
+def bf_rank_key(v: BfVerdict) -> tuple:
+    x = v.listing
+    tier = v.tier if v.tier is not None else 9
+    return (tier, x.floor == 0, x.rent if x.rent is not None else 10**9, x.id)
+
+
+def bf_ranked(verdicts: Iterable[BfVerdict]) -> list[BfVerdict]:
+    return sorted(verdicts, key=bf_rank_key)
