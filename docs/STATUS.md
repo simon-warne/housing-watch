@@ -6,7 +6,7 @@ Updated: 2026-11-26, end of M3 (rules and alerts). Reports: `docs/reports/M0.md`
 - M3 is done (`m3`, **not pushed**). `config.yaml` and `config.py` hold the criteria; queue days and BOOKED_IDS come from env. `rules.py` gives status, eligibility and ranking. `alerts.py` covers the five alerts with dedupe, through a private `state.db` (alert log and failure streak). The history DB is public and holds no alerts. 205 tests pass.
 
 ## Next, in order
-1. Simon decides on the privacy item below, then pushes `main` and the `m3` tag.
+1. Simon force-pushes the rewritten history (`main` and all tags, commands in the M3 chat). Then he asks GitHub Support to purge cached views of the old commits (optional, see below).
 2. M4 goes live in a fresh session (plan mode):
    - The runner: fetch the list, then the detail pages of eligible listings for their deadline, then `record()`.
    - On success, `run_ok`, `listing_alerts` and `digest_alert`; on failure or 0 listings, `run_failed`; then `dispatch`.
@@ -18,7 +18,7 @@ Updated: 2026-11-26, end of M3 (rules and alerts). Reports: `docs/reports/M0.md`
    - Within 48 h of a deadline, consider using the detail page's live top days (PRD §1: no false "winnable").
 
 ## Open for Simon
-- **Real queue days are public:** `docs/PRD.md` §3 and `docs/reports/M0.md` on `origin/main`. Redact both and force-push a rewritten history, or accept it (`docs/reports/M3.md`).
+- **Queue-days redaction (2026-11-26):** history rewritten locally with `git filter-repo`, 0 hits left. GitHub still serves the old commits by SHA until Support purges them. A backup mirror of the old history is in the session scratchpad (temporary).
 - Before going live: check Mina sidor's number against the computed one, and when the daily +1 lands.
 
 ## Gotchas learned
