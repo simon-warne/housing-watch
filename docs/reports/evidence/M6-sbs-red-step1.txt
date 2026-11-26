@@ -1,0 +1,5 @@
+E   ModuleNotFoundError: No module named 'housing_watch.sbs'
+=========================== short test summary info ============================
+ERROR tests/test_sbs.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.06s
