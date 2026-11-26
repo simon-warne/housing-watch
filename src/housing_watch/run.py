@@ -23,6 +23,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from housing_watch.alerts import (
+    GRACE,
     Alert,
     digest_alert,
     dispatch,
@@ -35,9 +36,7 @@ from housing_watch.config import QueueDays, load_booked, load_config, load_queue
 from housing_watch.crypto import decrypt, encrypt
 from housing_watch.history import deadline, open_db, record
 from housing_watch.ntfy import make_send
-from housing_watch.rules import classify, rank_key
 from housing_watch.sssb import (
-    STOCKHOLM,
     Detail,
     Listing,
     detail_url,
@@ -91,44 +90,59 @@ def merge(x: Listing, d: Detail | None) -> Listing:
     )
 
 
-def pick_details(
-    hist: sqlite3.Connection,
-    listings: Sequence[Listing],
-    cfg,
-    mine: int,
-    booked: frozenset[str],
-    now: datetime,
-) -> list[Listing]:
-    """Eligible or booked listings that need a detail request this run, soonest first.
+def _worth_details(x: Listing, cfg) -> bool:
+    """Could alert for *someone*: the public config.yaml rule with status ignored.
 
-    No known deadline: fetched once (record() keeps it). Closing within 48 h and ahead (or
-    booked): every run, for live top days. Closed: never. At most DETAIL_CAP; the rest wait
-    for the next run.
+    Never my status or BOOKED_IDS: which listings get detail requests shows in the public
+    history and in the step's run time, so it must not depend on anything private (M4 review).
     """
-    near: list[tuple[datetime, str, Listing]] = []
-    unknown: list[tuple[tuple, Listing]] = []
-    for x in listings:
-        v = classify(x, cfg, mine)
-        if not (v.eligible or x.id in booked):
+    in_window = cfg.move_in_from <= x.move_in <= cfg.move_in_to
+    rent_ok = x.rent <= cfg.rent_max or (x.rent <= cfg.rent_stretch and cfg.is_stretch(x.area))
+    alert_type = x.type.casefold() in (t.casefold() for t in cfg.alert_types)
+    return alert_type and in_window and rent_ok
+
+
+def _rotate(xs: list[Listing], now: datetime) -> list[Listing]:
+    """Shift by DETAIL_CAP per half-hour slot, so over two runs every listing gets a turn."""
+    if not xs:
+        return xs
+    k = int(now.timestamp() // 1800) * DETAIL_CAP % len(xs)
+    return xs[k:] + xs[:k]
+
+
+def pick_details(
+    hist: sqlite3.Connection, listings: Sequence[Listing], cfg, now: datetime
+) -> list[Listing]:
+    """Listings that need a detail request this run (public facts only, see _worth_details).
+
+    No known deadline: fetched once (record() keeps it). Closing within 48 h: every run, for
+    live top days, those in the last-call window first; rotated when there are more than
+    DETAIL_CAP. Closed: never. At most DETAIL_CAP; the rest wait for the next run.
+    """
+    urgent_by = timedelta(hours=cfg.last_call_hours) + GRACE
+    urgent: list[Listing] = []
+    near: list[Listing] = []
+    unknown: list[Listing] = []
+    for x in sorted(listings, key=lambda x: x.id):
+        if not _worth_details(x, cfg):
             continue
         dl = deadline(hist, x.id)
         if dl is None:
-            unknown.append((rank_key(v), x))
-        elif now < dl <= now + LIVE_WINDOW and (v.ahead or x.id in booked):
-            # Behind stays behind (the higher figure only goes up), so no request is needed.
-            near.append((dl, x.id, x))
-    near.sort(key=lambda t: (t[0], t[1]))
-    unknown.sort(key=lambda t: t[0])
-    return ([x for *_, x in near] + [x for _, x in unknown])[:DETAIL_CAP]
+            unknown.append(x)
+        elif now < dl <= now + urgent_by:
+            urgent.append(x)
+        elif now < dl <= now + LIVE_WINDOW:
+            near.append(x)
+    unknown.sort(key=lambda x: (cfg.tier(x.area), x.floor == 0, x.rent, x.id))
+    return (_rotate(urgent, now) + _rotate(near, now) + unknown)[:DETAIL_CAP]
 
 
 def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
         raise EmptyRun("0 listings parsed")
-    mine = queue.on(now.astimezone(STOCKHOLM).date())
     details: dict[str, Detail] = {}
-    for x in pick_details(hist, listings, cfg, mine, booked, now):
+    for x in pick_details(hist, listings, cfg, now):
         sleep(PAUSE_S)
         details[x.id] = parse_detail(load_jsonp(get(detail_url(x))), x.id)
     listings = [merge(x, details.get(x.id)) for x in listings]

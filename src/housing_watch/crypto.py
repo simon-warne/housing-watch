@@ -1,10 +1,28 @@
-"""state.db encryption (M4): Fernet (AES-128-CBC + HMAC), a fresh nonce every call.
+"""state.db encryption (M4): Fernet (AES-128-CBC + HMAC), a fresh nonce every call, plaintext
+padded to 64 KiB buckets.
 
 Re-encrypting every run makes every push to `data` look alike, so push timing reveals
 nothing about alerts (Simon, 2026-11-26). A wrong key or a tampered file raises.
 """
 
 from cryptography.fernet import Fernet, InvalidToken
+
+# Fernet hides content, not length: pad so a logged alert doesn't change the size (M4 review).
+BUCKET = 64 * 1024
+_LEN = 8
+
+
+def pad(data: bytes) -> bytes:
+    n = len(data) + _LEN
+    size = -(-n // BUCKET) * BUCKET
+    return len(data).to_bytes(_LEN, "big") + data + b"\0" * (size - n)
+
+
+def unpad(blob: bytes) -> bytes:
+    n = int.from_bytes(blob[:_LEN], "big")
+    if len(blob) % BUCKET or n > len(blob) - _LEN:
+        raise CryptoError("state.db.enc: bad padding")
+    return blob[_LEN : _LEN + n]
 
 
 class CryptoError(Exception):
@@ -19,12 +37,13 @@ def _fernet(key: str | bytes | None) -> Fernet:
 
 
 def encrypt(data: bytes, key: str | bytes | None) -> bytes:
-    return _fernet(key).encrypt(data)
+    return _fernet(key).encrypt(pad(data))
 
 
 def decrypt(blob: bytes, key: str | bytes | None) -> bytes:
     f = _fernet(key)
     try:
-        return f.decrypt(blob)
+        raw = f.decrypt(blob)
     except InvalidToken:
         raise CryptoError("state.db.enc: wrong STATE_KEY or tampered file") from None
+    return unpad(raw)

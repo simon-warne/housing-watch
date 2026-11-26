@@ -42,9 +42,9 @@ WINNABLE = {
 }
 PAX = "5201-0108-050"  # top 182: tied from 28 Nov (180 + 2), winnable after (STATUS gotcha)
 WINNABLE_LATE = WINNABLE | {PAX}
-# Eligible (type, window, rent) whatever the status: the WINNABLE six plus five where 180 is
-# behind. 11 > DETAIL_CAP, so the first run leaves one (the lowest ranked) for the next.
-ELIGIBLE = 11
+# Worth a detail request by the public rule (type, window, rent; stretch areas up to 7,000
+# whatever the status): the 11 eligible ones plus Idun 1 rum & pentry 6,057. 12 > DETAIL_CAP.
+PUBLIC = 12
 
 
 def _unwrap(text: str) -> dict:
@@ -171,21 +171,25 @@ def test_details_fetched_once_for_unknown_deadlines(tmp_path, sssb):
     sssb.calls.clear()
     rc, phone, _ = go(tmp_path, sssb, T0 + timedelta(minutes=30))
     assert rc == 0
-    assert len(sssb.detail_calls()) == ELIGIBLE - DETAIL_CAP  # the one left over
+    assert len(sssb.detail_calls()) == PUBLIC - DETAIL_CAP  # the ones left over
     assert phone.got == []  # nothing new
     sssb.calls.clear()
     go(tmp_path, sssb, T0 + timedelta(minutes=60))
     assert sssb.detail_calls() == []  # all deadlines known and > 48 h away
 
 
-def test_details_every_run_within_48h_of_deadline(tmp_path, sssb):
+def test_details_every_run_within_48h_of_deadline_rotating(tmp_path, sssb):
     near = DEADLINE - timedelta(hours=47)
-    go(tmp_path, sssb, near - timedelta(hours=2))
+    go(tmp_path, sssb, near - timedelta(hours=3))
+    go(tmp_path, sssb, near - timedelta(hours=2))  # all 12 deadlines known now
+    seen = set()
     for i in range(2):
         sssb.calls.clear()
         go(tmp_path, sssb, near + timedelta(minutes=30 * (i + 1)))
-        # Only listings I'm ahead on (from 28 Nov Pax too): behind stays behind, no request.
-        assert len(sssb.detail_calls()) == len(WINNABLE_LATE)
+        calls = sssb.detail_calls()
+        assert len(calls) == DETAIL_CAP  # 12 close within 48 h, capped
+        seen |= set(calls)
+    assert len(seen) == PUBLIC  # rotation: everyone gets a live figure within two runs
 
 
 def test_no_details_after_the_deadline(tmp_path, sssb):
@@ -211,19 +215,36 @@ def test_detail_cap_per_run(tmp_path, sssb):
     assert len(sssb.detail_calls()) == len(sssb.items) - 20
 
 
-@pytest.mark.parametrize("booked,extra", [("", 0), ("1106-2108-009", 1)])
-def test_booked_listing_gets_live_details_near_close(tmp_path, sssb, booked, extra):
-    # Jerum corridor, top 314: behind, so only a booking makes it worth a live request.
-    env = {**ENV, "BOOKED_IDS": booked}
-    go(tmp_path, sssb, T0, env=env)
-    go(tmp_path, sssb, T0 + timedelta(minutes=30), env=env)
-    sssb.calls.clear()
-    go(tmp_path, sssb, DEADLINE - timedelta(hours=40), env=env)
-    assert len(sssb.detail_calls()) == len(WINNABLE_LATE) + extra
+def _public_trace(tmp_path, sssb, env):
+    """What the world can see: detail requests per run, and the history DB's rows."""
+    times = [
+        T0,
+        T0 + timedelta(minutes=30),
+        DEADLINE - timedelta(hours=40),
+        DEADLINE - timedelta(hours=4),
+    ]
+    trace = []
+    for t in times:
+        sssb.calls.clear()
+        go(tmp_path, sssb, t, env=env)
+        trace.append(sorted(sssb.detail_calls()))
+    conn = sqlite3.connect(tmp_path / "history.sqlite")
+    rows = conn.execute("SELECT * FROM observations ORDER BY listing_id, seen_at").fetchall()
+    conn.close()
+    return trace, rows
+
+
+def test_public_traces_do_not_depend_on_queue_days_or_bookings(tmp_path):
+    """M4 review: requests and history must not reveal my days or BOOKED_IDS."""
+    a = _public_trace(tmp_path / "a", FakeSSSB(), ENV)
+    other = {**ENV, "QUEUE_DAYS": "400@2026-11-26", "BOOKED_IDS": "1106-2108-009,7202-5306-106"}
+    b = _public_trace(tmp_path / "b", FakeSSSB(), other)
+    assert a == b
 
 
 def test_higher_detail_top_suppresses_false_winnable(tmp_path, sssb):
     """PRD §1: the list may lag; near close the detail page's higher figure wins."""
+    sssb.set_items([i for i in sssb.items if i["objektNr"] in WINNABLE_LATE])  # under the cap
     go(tmp_path, sssb, DEADLINE - timedelta(hours=60))  # deadlines known, alerts sent
     sssb.detail_top[STRIX] = 200  # someone with 200 days booked; the list still says 132
     rc, phone, _ = go(tmp_path, sssb, DEADLINE - timedelta(hours=4))  # last-call window
@@ -234,6 +255,7 @@ def test_higher_detail_top_suppresses_false_winnable(tmp_path, sssb):
 
 
 def test_lower_detail_top_does_not_lower_the_figure(tmp_path, sssb):
+    sssb.set_items([i for i in sssb.items if i["objektNr"] in WINNABLE_LATE])
     go(tmp_path, sssb, DEADLINE - timedelta(hours=60))
     sssb.detail_top[STRIX] = 50  # the higher (list) figure is kept
     go(tmp_path, sssb, DEADLINE - timedelta(hours=40))
@@ -396,3 +418,18 @@ def test_digest_on_sunday_evening(tmp_path, sssb):
     )
     _, phone, _ = go(tmp_path, sssb, sunday)
     assert "digest" in {a.kind for a in phone.got}
+
+
+def test_state_size_does_not_change_when_alerts_are_logged(tmp_path, sssb):
+    """M4 review: Fernet hides content, not length; padding hides that alerts were logged."""
+    for item in sssb.items:
+        item["inflyttningDatum"] = "2026-12-16"  # outside the window: no alerts
+    _, phone, _ = go(tmp_path, sssb, T0)
+    assert phone.got == []
+    before = len((tmp_path / "state.db.enc").read_bytes())
+    for item in sssb.items:  # 24 winnable corridor rooms: enough alerts to grow SQLite pages
+        item["inflyttningDatum"] = IN_WINDOW
+        item["typ"], item["hyra"], item["antalIntresse"] = "Rum i korridor", "3\xa0000", "9 (1st)"
+    _, phone, _ = go(tmp_path, sssb, T0 + timedelta(minutes=30))
+    assert len(phone.got) == 24
+    assert len((tmp_path / "state.db.enc").read_bytes()) == before

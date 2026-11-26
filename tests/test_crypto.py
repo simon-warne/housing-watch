@@ -33,3 +33,11 @@ def test_tampered_raises():
 def test_bad_key_raises(bad):
     with pytest.raises(CryptoError):
         encrypt(b"x", bad)
+
+
+def test_length_is_padded_to_buckets():
+    from housing_watch.crypto import BUCKET
+
+    assert len(encrypt(b"", KEY)) == len(encrypt(b"x" * (BUCKET - 100), KEY))
+    assert len(encrypt(b"x" * (BUCKET + 1), KEY)) > len(encrypt(b"", KEY))
+    assert decrypt(encrypt(b"x" * (BUCKET + 1), KEY), KEY) == b"x" * (BUCKET + 1)
