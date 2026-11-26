@@ -11,6 +11,7 @@ Updated: 2026-11-26, M5 done (part B code, review, report), tagged `m5`. Reports
 2. Check Mina sidor's number against the computed one, and when the daily +1 lands.
 3. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
 4. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`).
+5. M6 (PRD §6): reconnaissance of the other queues in a fresh session (plan first), in order SBS › HomeQ › Förvaltaren › Wallenstam › Heimstaden/Stena direct; stop for Simon before product code.
 
 ## Open for Simon
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.
