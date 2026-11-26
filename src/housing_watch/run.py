@@ -8,9 +8,10 @@ state only exists in a temp dir during the run. When the run has saved everythin
 so every push looks alike (Simon, 2026-11-26).
 
 Logs are one fixed line (`ok: N listings`, `skipped: recent fetch`, `failed: <ErrorType>`,
-then ` · bf ok: M` etc. for Bostadsförmedlingen): the Action log is public, so no alert counts,
-titles, queue days or error text. SSSB and BF run one after the other, each in its own try:
-a failure in one never stops the other's alerts, and each has its own guard and heartbeat.
+then ` · bf ok: M` for Bostadsförmedlingen and ` · fv ok: K` for Förvaltaren): the Action log
+is public, so no alert counts, titles, queue days or error text. SSSB, BF and Förvaltaren run
+one after the other, each in its own try: a failure in one never stops the others' alerts,
+and each has its own guard and heartbeat.
 """
 
 import argparse
@@ -24,13 +25,15 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from housing_watch import bf
+from housing_watch import bf, fv
 from housing_watch.alerts import (
     GRACE,
     Alert,
     bf_listing_alerts,
     digest_alert,
     dispatch,
+    fv_alerted,
+    fv_listing_alerts,
     listing_alerts,
     open_state,
     run_failed,
@@ -49,13 +52,31 @@ from housing_watch.config import (
     load_bf_since,
     load_booked,
     load_config,
+    load_fv_points,
     load_queue_days,
 )
 from housing_watch.crypto import decrypt, encrypt
-from housing_watch.history import bf_detail, bf_record, deadline, open_db, record
+from housing_watch.fv import (
+    FvDetail,
+    FvListing,
+    fv_deadline,
+    fv_get,
+    parse_fv_detail,
+    parse_fv_list,
+)
+from housing_watch.history import (
+    bf_detail,
+    bf_record,
+    deadline,
+    fv_detail,
+    fv_record,
+    open_db,
+    record,
+)
 from housing_watch.ntfy import make_send
-from housing_watch.rules import bf_worth_details
+from housing_watch.rules import bf_worth_details, fv_worth_details
 from housing_watch.sssb import (
+    STOCKHOLM,
     Detail,
     Listing,
     ParseError,
@@ -102,12 +123,12 @@ def _set_meta(state: sqlite3.Connection, key: str, value: str) -> None:
         )
 
 
-def _observations(hist: sqlite3.Connection) -> tuple[int, int]:
+def _observations(hist: sqlite3.Connection) -> tuple[int, ...]:
     """Rows per observation table, compared one by one: growth in one source must not hide
     a loss in the other (M5 review)."""
     return tuple(
         hist.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-        for t in ("observations", "bf_observations")
+        for t in ("observations", "bf_observations", "fv_observations")
     )
 
 
@@ -219,6 +240,53 @@ def _watch_bf(hist, cfg, since, now, get, sleep) -> tuple[int, list]:
     return len(listings), alerts
 
 
+def pick_fv_details(
+    hist: sqlite3.Connection, listings: Sequence[FvListing], cfg, now: datetime
+) -> list[FvListing]:
+    """FV flats that need a detail page this run, by public facts only (fv_worth_details, the
+    list's deadline, the stored move-in), never my points: closing within 48 h → every run,
+    the last-call window first, rotated; never fetched → once; known move-in outside the
+    window or closed → never. At most DETAIL_CAP."""
+    urgent_by = timedelta(hours=cfg.last_call_hours) + GRACE
+    urgent: list[FvListing] = []
+    near: list[FvListing] = []
+    unknown: list[FvListing] = []
+    for x in sorted(listings, key=lambda x: x.id):
+        if not fv_worth_details(x, cfg):
+            continue
+        dl = fv_deadline(x.deadline)
+        d = fv_detail(hist, x.id)
+        if dl <= now or (d and not cfg.move_in_from <= d.move_in <= cfg.move_in_to):
+            continue
+        if dl <= now + urgent_by:
+            urgent.append(x)
+        elif dl <= now + LIVE_WINDOW:
+            near.append(x)
+        elif d is None:
+            unknown.append(x)
+    unknown.sort(key=lambda x: (x.floor == 0, x.rent, x.id))
+    return (_rotate(urgent, now) + _rotate(near, now) + unknown)[:DETAIL_CAP]
+
+
+def _watch_fv(hist, cfg, points, state, now, get, sleep) -> tuple[int, list]:
+    listings = parse_fv_list(get(fv.LIST_URL), now)
+    if not listings:
+        raise EmptyRun("0 FV listings parsed")
+    details: dict[str, FvDetail] = {}
+    errors: list[ParseError] = []
+    for x in pick_fv_details(hist, listings, cfg, now):
+        sleep(PAUSE_S)
+        try:
+            details[x.id] = parse_fv_detail(get(fv.detail_url(x)), x)
+        except ParseError as e:  # one odd page must not block the others
+            errors.append(e)
+    fv_record(hist, listings, details, now)
+    alerts = fv_listing_alerts(hist, cfg, points, frozenset(details), fv_alerted(state), now)
+    if errors:
+        raise PartialRun(errors[0], len(listings), alerts)
+    return len(listings), alerts
+
+
 def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
@@ -250,6 +318,7 @@ def run(
     *,
     get: Callable[[str], str],
     bf_get: Callable[[str], str] | None = None,
+    fv_get: Callable[[str], str] | None = None,
     send: Callable[[Alert], object],
     sleep: Callable[[float], object],
     now: datetime,
@@ -259,7 +328,8 @@ def run(
 ) -> int:
     """One scheduled run. Returns 0 (ok or skipped) or 1 (SSSB or BF failed, saved and ready).
 
-    `bf_get` fetches Bostadsförmedlingen; None leaves BF out (SSSB-only tests).
+    `bf_get` fetches Bostadsförmedlingen and `fv_get` Förvaltaren; None leaves that source
+    out (tests of one source).
 
     Setup problems (config, secrets, key, missing or unexpected files, a shrinking history)
     raise instead, before `ready` exists, so nothing is pushed.
@@ -275,6 +345,7 @@ def run(
     queue = load_queue_days(env)
     booked = load_booked(env)
     bf_since = load_bf_since(env)
+    fv_points = load_fv_points(env, now.astimezone(STOCKHOLM).date())
     key = env.get("STATE_KEY")
     encrypt(b"", key)  # a bad key fails here, before any request
 
@@ -334,9 +405,20 @@ def run(
                     "bf ",
                     lambda: _watch_bf(hist, cfg, bf_since, now, bf_get, sleep),
                 )
-            if ok:  # after both parts, so it has this run's data and survives either failing
+            if fv_get is not None:
+                part(
+                    "fv",
+                    "fv_last_fetch",
+                    "fv ",
+                    lambda: _watch_fv(hist, cfg, fv_points, state, now, fv_get, sleep),
+                )
+            if ok:  # after every part, so it has this run's data and survives either failing
                 try:
-                    alerts.append(digest_alert(hist, cfg, queue, booked, now, bf_since=bf_since))
+                    alerts.append(
+                        digest_alert(
+                            hist, cfg, queue, booked, now, bf_since=bf_since, fv_points=fv_points
+                        )
+                    )
                     run_ok(state, source="digest")
                 except Exception as e:  # noqa: BLE001
                     failures.append(e)
@@ -371,6 +453,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             env,
             get=http_get,
             bf_get=bf_get,
+            fv_get=fv_get,
             send=make_send(env.get("NTFY_TOPIC", "")),
             sleep=time.sleep,
             now=datetime.now(UTC),
