@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from housing_watch.bf import BfDetail, BfListing
 from housing_watch.config import Config
+from housing_watch.fv import FvDetail, FvListing
 from housing_watch.sssb import Listing
 
 
@@ -174,3 +175,74 @@ def bf_rank_key(v: BfVerdict) -> tuple:
 
 def bf_ranked(verdicts: Iterable[BfVerdict]) -> list[BfVerdict]:
     return sorted(verdicts, key=bf_rank_key)
+
+
+# --- Förvaltaren (M6) ---
+class FvStatus(StrEnum):
+    WINNABLE = "winnable"  # more points than the top applicant
+    TIED = "tied"  # Förvaltaren's tie rule is unknown
+    BEHIND = "behind"
+    NO_APPLICANTS_SHOWN = "no applicants shown"  # no "Högst köpoäng" row: last call only
+    PENDING = "no detail yet"
+    NO_POINTS = "no FV points set"
+
+
+def fv_status(top_points: int | None, mine: int | None) -> FvStatus:
+    if mine is None:
+        return FvStatus.NO_POINTS
+    if top_points is None:
+        return FvStatus.NO_APPLICANTS_SHOWN
+    if mine > top_points:
+        return FvStatus.WINNABLE
+    return FvStatus.TIED if mine == top_points else FvStatus.BEHIND
+
+
+FV_CHANCE = {FvStatus.WINNABLE, FvStatus.TIED, FvStatus.NO_APPLICANTS_SHOWN}
+
+
+def fv_category(x: FvListing, cfg: Config) -> str:
+    t = x.type.casefold()
+    if t in (a.casefold() for a in cfg.fv.alert_types):
+        return "alert"
+    if t in (a.casefold() for a in cfg.fv.digest_types):
+        return "digest"
+    return "other"
+
+
+def fv_worth_details(x: FvListing, cfg: Config) -> bool:
+    """Could alert for *someone*: public facts only (type, rent, special contract), never my
+    points. All of Förvaltaren is Sundbyberg (tier 2), so there is no stretch band."""
+    return fv_category(x, cfg) == "alert" and not x.special and x.rent <= cfg.rent_max
+
+
+@dataclass(frozen=True)
+class FvVerdict:
+    listing: FvListing
+    detail: FvDetail | None
+    status: FvStatus
+    category: str
+    in_window: bool | None  # None = move-in not known yet
+    eligible: bool
+
+
+def fv_classify(x: FvListing, d: FvDetail | None, cfg: Config, mine: int | None) -> FvVerdict:
+    st = FvStatus.PENDING if d is None else fv_status(d.top_points, mine)
+    in_window = None if d is None else cfg.move_in_from <= d.move_in <= cfg.move_in_to
+    return FvVerdict(
+        listing=x,
+        detail=d,
+        status=st,
+        category=fv_category(x, cfg),
+        in_window=in_window,
+        eligible=fv_worth_details(x, cfg) and bool(in_window),
+    )
+
+
+def fv_rank_key(v: FvVerdict) -> tuple:
+    x = v.listing
+    return (x.floor == 0, x.rent, x.id)
+
+
+def fv_ranked(verdicts: Iterable[FvVerdict]) -> list[FvVerdict]:
+    """Best first: ground floor last, then lower rent (one area tier)."""
+    return sorted(verdicts, key=fv_rank_key)

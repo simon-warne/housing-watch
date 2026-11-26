@@ -1,4 +1,4 @@
-"""The five alerts of PRD §4, their wording, and dedupe through the private state.db (plan M3).
+"""The alerts of PRD §4 (SSSB, BF, Förvaltaren), their wording, and dedupe via state.db (M3).
 
 state.db holds the alert log and the heartbeat's failure streak. It reveals which listings I
 could win (so my queue days) and BOOKED_IDS, so it is never committed in the clear (M4
@@ -16,17 +16,31 @@ from pathlib import Path
 
 from housing_watch.bf import BASE as BF_BASE
 from housing_watch.bf import BfListing, bf_deadline
-from housing_watch.config import Config, QueueDays
-from housing_watch.history import active, bf_active, bf_seen_since, seen_since
+from housing_watch.config import Config, FvPoints, QueueDays
+from housing_watch.fv import FvListing, fv_deadline
+from housing_watch.fv import detail_url as fv_url
+from housing_watch.history import (
+    active,
+    bf_active,
+    bf_seen_since,
+    fv_active,
+    fv_seen_since,
+    seen_since,
+)
 from housing_watch.rules import (
     CHANCE,
+    FV_CHANCE,
     BfStatus,
     BfVerdict,
+    FvStatus,
+    FvVerdict,
     Status,
     Verdict,
     bf_classify,
     bf_rank_key,
     classify,
+    fv_classify,
+    fv_rank_key,
     rank_key,
 )
 from housing_watch.sssb import STOCKHOLM, Listing
@@ -248,6 +262,7 @@ def digest_alert(
     booked: frozenset[str],
     now: datetime,
     bf_since: date | None = None,
+    fv_points: FvPoints | None = None,
 ) -> Alert | None:
     """The weekly digest, due from the digest time until 24 h later (catch-up for late runs).
 
@@ -284,9 +299,10 @@ def digest_alert(
     if late:
         lines.append(f"{late} more after the move-in window")
     rest = [_digest_line(v, removed, booked, cfg) for v, removed in shown]
+    fv_head, fv_lines, fv_title = _fv_digest(hist, cfg, _fv_mine(fv_points, now), since)
     bf_head, bf_lines, bf_title = _bf_digest(hist, cfg, bf_since, since)
-    lines += bf_head
-    rest += bf_lines
+    lines += fv_head + bf_head
+    rest += fv_lines + bf_lines
     while rest:
         line = rest.pop(0)
         more = f"+{len(rest) + 1} more"
@@ -300,7 +316,9 @@ def digest_alert(
         listing_id=None,
         state_key=f"{week.year}-W{week.week:02d}",
         priority="low",
-        title=f"Weekly digest, week {week.week}: {len(rows)} seen, {open_ahead} winnable{bf_title}",
+        title=f"Weekly digest, week {week.week}: {len(rows)} seen, {open_ahead} winnable"
+        + fv_title
+        + bf_title,
         body="\n".join(lines),
         url=None,
     )
@@ -492,7 +510,189 @@ def _bf_digest_line(v: BfVerdict, removed: datetime | None, cfg: Config) -> str:
     return f"BF {_bf_head(x)} · top {top} · {', '.join(tags)}"
 
 
+# --- Förvaltaren (M6) ---
+def _fv_mine(points: FvPoints | None, now: datetime) -> int | None:
+    if now.tzinfo is None:
+        raise ValueError("now must be tz-aware")
+    return None if points is None else points.on(now.astimezone(STOCKHOLM).date())
+
+
+def _fv_head(x: FvListing) -> str:
+    return f"{x.area}, {x.type}, {_kr(x.rent)}"
+
+
+def _fv_marks(v: FvVerdict) -> str:
+    m = [
+        s
+        for s, on in (
+            ("tied", v.status == FvStatus.TIED),
+            ("no applicants shown", v.status == FvStatus.NO_APPLICANTS_SHOWN),
+        )
+        if on
+    ]
+    return f" ({', '.join(m)})" if m else ""
+
+
+def _fv_applicants(v: FvVerdict) -> str:
+    n = v.detail.applicants if v.detail.applicants is not None else v.listing.applicants
+    return _applicants(n)
+
+
+def _fv_alert(
+    v: FvVerdict, mine: int, alerted: frozenset[str], now: datetime, window: timedelta
+) -> Alert | None:
+    x, d = v.listing, v.detail
+    dl = fv_deadline(x.deadline)
+    if dl <= now:
+        return None  # closed: no false "winnable" after the deadline
+    lid, url = f"fv:{x.id}", fv_url(x)
+    if v.status == FvStatus.BEHIND:
+        if lid not in alerted:
+            return None
+        return Alert(
+            kind="lead_lost",
+            listing_id=lid,
+            state_key=f"lost@{x.deadline.isoformat()}",
+            priority="high",
+            title=f"FV · Lead lost: {x.area}, {x.address}",
+            body=f"Top is now {d.top_points}, you have {mine} · {_fv_applicants(v)}"
+            f" · closes {_when(dl)}",
+            url=url,
+        )
+    if v.status not in FV_CHANCE:
+        return None
+    if dl - now <= window:
+        local, today = dl.astimezone(STOCKHOLM), now.astimezone(STOCKHOLM).date()
+        day = "today" if local.date() == today else _day(local.date())
+        if d.top_points is None:
+            lead = f"no applicants shown, you have {mine}"
+        else:
+            word = "tied" if v.status == FvStatus.TIED else "you lead"
+            lead = f"{word} {mine} vs {d.top_points} · {_fv_applicants(v)}"
+        return Alert(
+            kind="last_call",
+            listing_id=lid,
+            state_key=dl.astimezone(UTC).isoformat(),
+            priority="urgent",
+            title=f"FV · LAST CALL, closes {local:%H:%M}{_fv_marks(v)}: {_fv_head(x)}",
+            body=f"Closes {local:%H:%M} {day} (in {_left(dl - now)}) · {lead}\n"
+            f"{x.address}, {_floor(x.floor)} · move-in {d.move_in.isoformat()}",
+            url=url,
+        )
+    if v.status == FvStatus.NO_APPLICANTS_SHOWN:
+        return None  # last call only (Simon, 2026-11-26)
+    if v.status == FvStatus.TIED and lid in alerted:
+        return None  # after my own alert, a tie is most likely my own application
+    return Alert(
+        kind="winnable",
+        listing_id=lid,
+        state_key=f"{v.status}@{x.deadline.isoformat()}",
+        priority="high",
+        title=f"FV · Winnable{_fv_marks(v)}: {_fv_head(x)}",
+        body="\n".join(
+            [
+                f"{x.area} · {x.address}, {_floor(x.floor)}",
+                f"{_kr(x.rent)}/month · move-in {d.move_in.isoformat()}",
+                f"Top {d.top_points} points vs your {mine} · {_fv_applicants(v)}",
+                f"Apply by {_day(x.deadline)}",
+            ]
+        ),
+        url=url,
+    )
+
+
+def fv_alerted(state: sqlite3.Connection) -> frozenset[str]:
+    """FV listings I was already told I could win (winnable or last call), from the alert log.
+    A later "behind" for one of these is a lost lead."""
+    rows = state.execute(
+        "SELECT DISTINCT listing_id FROM alerts "
+        "WHERE listing_id LIKE 'fv:%' AND kind IN ('winnable', 'last_call')"
+    ).fetchall()
+    return frozenset(r[0] for r in rows)
+
+
+def fv_listing_alerts(
+    hist: sqlite3.Connection,
+    cfg: Config,
+    points: FvPoints | None,
+    fresh: frozenset[str],
+    alerted: frozenset[str],
+    now: datetime,
+) -> list[Alert]:
+    """FV winnable, last call and lead lost, urgent first, then by rank.
+
+    Only listings whose detail page was fetched this run (`fresh`): the top points exist only
+    there. No points (secrets unset) → no alerts."""
+    mine = _fv_mine(points, now)
+    if mine is None:
+        return []
+    window = timedelta(hours=cfg.last_call_hours) + GRACE
+    out: list[tuple[tuple, Alert]] = []
+    for x, d in fv_active(hist):
+        if x.id not in fresh or d is None:
+            continue
+        v = fv_classify(x, d, cfg, mine)
+        if not v.eligible:
+            continue
+        if a := _fv_alert(v, mine, alerted, now, window):
+            out.append((fv_rank_key(v), a))
+    out.sort(key=lambda p: (ORDER[p[1].kind], p[0]))
+    return [a for _, a in out]
+
+
+def _fv_digest(
+    hist: sqlite3.Connection, cfg: Config, mine: int | None, week_start: datetime
+) -> tuple[list[str], list[str], str]:
+    """(summary lines, listing lines, title suffix) for the digest; empty without FV rows."""
+    rows = [
+        (fv_classify(x, d, cfg, mine), removed) for x, d, removed in fv_seen_since(hist, week_start)
+    ]
+    if not rows:
+        return [], [], ""
+    winning: dict[str, list[int]] = defaultdict(list)
+    for v, removed in rows:
+        if removed and v.category == "alert" and v.detail and v.detail.top_points is not None:
+            winning[v.listing.area].append(v.detail.top_points)
+    ranges = [
+        f"{a} {min(p)}–{max(p)}" if min(p) != max(p) else f"{a} {p[0]}"
+        for a, p in sorted(winning.items())
+    ]
+    chance = {FvStatus.WINNABLE, FvStatus.TIED}
+    open_chance = sum(1 for v, removed in rows if not removed and v.eligible and v.status in chance)
+    shown = sorted(
+        (p for p in rows if p[0].detail is None or p[0].detail.move_in <= cfg.move_in_to),
+        key=lambda p: (not p[0].in_window, p[0].category != "alert", fv_rank_key(p[0])),
+    )
+    late = len(rows) - len(shown)
+    head = [
+        f"FV: {len(rows)} seen, {open_chance} winnable"
+        + (f", {late} after the window" if late else ""),
+        "FV winning points: " + (" · ".join(ranges) or "none closed this week"),
+    ]
+    lines = [_fv_digest_line(v, removed, cfg) for v, removed in shown]
+    return head, lines, f" · FV {len(rows)} seen, {open_chance} winnable"
+
+
+def _fv_digest_line(v: FvVerdict, removed: datetime | None, cfg: Config) -> str:
+    x, d = v.listing, v.detail
+    kind = f"other type: {x.type}" if v.category == "other" else x.type
+    tags = [str(v.status)]
+    if x.rent > cfg.rent_max and v.category != "digest":  # 2+ rooms: rent would be shared
+        tags.append("over budget")
+    if x.special:
+        tags.append(x.special)
+    if removed:
+        tags.append("closed")
+    if d and d.move_in < cfg.move_in_from:
+        tags.append(f"early move-in {d.move_in.isoformat()}")
+    top = (d.top_points if d.top_points is not None else "none") if d else "?"
+    return f"FV {x.area}, {kind}, {_kr(x.rent)} · top {top} · {', '.join(tags)}"
+
+
 # --- heartbeat (failure streak in state.db meta) ---
+SOURCE_NAMES = {"bf": "BF", "fv": "FV"}
+
+
 def _meta(state: sqlite3.Connection, key: str) -> str | None:
     row = state.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else None
@@ -531,7 +731,7 @@ def run_failed(
         listing_id=None,
         state_key=f"{source}@{since}" if source else since,
         priority="high",
-        title=f"{'BF' if source == 'bf' else 'housing-watch'}: {count} failed runs since {at}",
+        title=f"{SOURCE_NAMES.get(source, 'housing-watch')}: {count} failed runs since {at}",
         body=f"Last error: {error[:1000]}",
         url=None,
     )
