@@ -9,3 +9,8 @@ One line each, newest last: `YYYY-MM-DD · decision · why · (Simon | Claude, r
 - 2026-11-26 · Hooks: ruff format + check after Python edits; pytest on Stop · must-always checks are deterministic, not reminders · (Simon)
 - 2026-11-26 · Tooling: Python 3.14 with uv, pytest, ruff; CI = ruff, pytest, gitleaks · S-size defaults from code-setup §2 · (Claude, reversible)
 - 2026-11-26 · M0 plan approved (docs/plans/M0.md) · reconnaissance before any product code · (Simon)
+- 2026-11-26 · SQLite history lives on a separate `data` branch, committed only when something changed · artifacts expire after 90 days and the cache after 7 days unused; durable and inspectable · (Simon)
+- 2026-11-26 · Booked listings marked in GitHub repo variable `BOOKED_IDS` (comma-separated objektNr) · public repo, so not a committed file; easy to edit · (Simon)
+- 2026-11-26 · PRD §2/§5 facts updated from M0 (widgets JSON endpoint, one request for all listings) · facts, no scope change · (Simon)
+- 2026-11-26 · ntfy test from GitHub Actions in M0 via a manual-only workflow · proves the secret → Actions → phone path before M4 · (Simon)
+- 2026-11-26 · Schedule at odd minutes and add an explicit keep-alive in M4 · GitHub delays/drops top-of-hour runs; 60-day pause, and the docs don't say bot commits count as activity · (Claude, reversible)

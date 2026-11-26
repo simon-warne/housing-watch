@@ -1,0 +1,21 @@
+name: ntfy-test
+# Manual only: proves the NTFY_TOPIC secret -> Actions -> phone path (M0).
+# The topic is never printed: it is passed by env, and ntfy's reply (which echoes the topic) goes to /dev/null.
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test push
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ -z "$NTFY_TOPIC" ]; then echo "NTFY_TOPIC secret is not set"; exit 1; fi
+          curl -sSf -o /dev/null \
+            -H "Title: housing-watch test" \
+            -H "Tags: house" \
+            -d "Test from GitHub Actions (M0). If you see this, alerts can reach your phone." \
+            "https://ntfy.sh/$NTFY_TOPIC"
+          echo "sent"

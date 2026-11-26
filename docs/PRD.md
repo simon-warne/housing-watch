@@ -16,10 +16,10 @@ Never miss an SSSB room I can win, and build my own data on how many queue days 
 - Zero false "you're winning" alerts in the last 48 h before a deadline.
 
 ## 2. What SSSB shows (checked 26 Nov 2026)
-- Listings: https://minasidor.sssb.se/lediga-bostader/ (paged, `?pagination=N&paginationantal=10`). Each has type, address, area, size, rent, move-in date, floor, flags ("10 mån hyra", "Elström ingår", "Max 4 år"), and **"Ködagar: X (Nst)"** = the current top applicant's queue days and the number of applicants.
+- Listings: shown at https://minasidor.sssb.se/lediga-bostader/, but the data comes from the widget endpoint `GET /widgets/?callback=cb&widgets[]=objektlistabilder@lagenheter` (JSONP): **all listings in one response**, pagination ignored (M0, Simon 2026-11-26). Each has type, address, area, size, rent, move-in date, floor, flags ("10 mån hyra", "Elström ingår", "Max 4 år"), and **"Ködagar: X (Nst)"** = the current top applicant's queue days and the number of applicants.
 - Detail page: booking deadline, e.g. "Kan bokas till 2026-11-30 klockan 16:00". Offer goes to Mina sidor about 45 min after close.
 - robots.txt allows everything except `/wp-admin/` (and allows `/wp-admin/admin-ajax.php`).
-- Unknown: whether the queue-day figures are visible when logged out (M0 finds out).
+- **Queue days are visible logged out** (`antalIntresse: "132 (5st)"`); the deadline comes from the detail widget `objektintresse` (by `refid`). No tie rule is published. (M0, 2026-11-26)
 
 **Rules that shape the alerts:** most queue days wins; up to 5 bookings per period; queue days are deleted on signing; **the second declined offer deletes all queue days**; corridor rooms charge 10 months a year (no June/July rent).
 
@@ -43,12 +43,12 @@ Never miss an SSSB room I can win, and build my own data on how many queue days 
 Each alert: area, address, rent, move-in, top days vs mine, applicants, deadline, link. No duplicates for the same listing and state.
 
 ## 5. How it works
-- Python. Fetch the listing pages at most every 30 min (detail pages only for listings that match, for their deadline), with a clear user-agent and pauses between requests.
+- Python. Fetch the listings at most every 30 min, one request for all of them (detail requests only for listings that match, for their deadline), with a clear user-agent and pauses between requests.
 - Parse into `Listing` (id, area, address, type, size, rent, flags, move-in, deadline, top_days, applicants, seen_at).
 - SQLite history: every observation is kept; changes and new listings are detected by comparing with the last run. Every alert sent is logged too (this is the record of what I was told and when).
 - Rules engine reads `config.yaml`, computes my queue days, decides alerts.
 - Notifications via **ntfy** (decided by Simon, 26 Nov; secret topic in a GitHub secret). The ntfy app keeps its own history; the database is the real record.
-- Runs on **GitHub Actions** on a schedule. Public repo (Simon, 2026-11-26), so minutes are unlimited. Verify in M0: how late scheduled runs start, and the rule that pauses schedules after a repo goes quiet. Where the database lives is decided in M0: committing it on every run means ~1,400 commits a month, so a separate `data` branch or an Actions cache/artifact is likely better.
+- Runs on **GitHub Actions** on a schedule. Public repo (Simon, 2026-11-26), so minutes are unlimited. Scheduled runs at odd minutes (GitHub delays or drops top-of-hour runs) and an explicit keep-alive for the 60-day pause (M0). The SQLite database lives on a separate `data` branch, committed only when something changed (Simon, 2026-11-26).
 
 ## 6. Milestones
 Each ends with its acceptance tests green, a short report with evidence in `docs/reports/`, and a tag.
@@ -81,7 +81,7 @@ Each ends with its acceptance tests green, a short report with evidence in `docs
 Size **S** under `~/Documents/_hub/skills/code-setup/SKILL.md` (Rotunda retrospective, 26 Nov). In short: `CLAUDE.md` ≤ 40 lines; `docs/DECISIONS.md` and `docs/STATUS.md`; one milestone per session in plan mode; tests first on saved SSSB pages; CI with pytest, ruff and gitleaks; no local services; one fresh-subagent review before M4 goes live; a one-screen report per milestone; tags. Not used: security harness, E2E, previews, design track. Alert wording gets one look from Simon in M3. M0 is the gatekeeper step (SSSB's logged-out data and terms, GitHub Actions limits, ntfy) before any product code.
 
 ## 9. Open questions
-1. Logged-out access to queue-day figures (M0).
+1. ~~Logged-out access to queue-day figures~~ **Visible logged out (M0, 2026-11-26).**
 2. ~~Private or public repo~~ **Public (Simon, 26 Nov).** So: the ntfy topic, my queue days and the list of listings I booked live in GitHub secrets or variables, never in committed files or committed history; the stored listing data is public SSSB data anyway.
-3. Where the database lives (committed vs. artifact).
-4. How I mark a listing as "booked" for the lead-lost alert (a line in config is the simplest).
+3. ~~Where the database lives~~ **`data` branch (Simon, 2026-11-26).**
+4. ~~How I mark a listing as "booked"~~ **GitHub variable `BOOKED_IDS`, comma-separated objektNr (Simon, 2026-11-26).**
