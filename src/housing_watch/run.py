@@ -7,8 +7,10 @@ state only exists in a temp dir during the run. When the run has saved everythin
 `DIR/ready`; the workflow pushes only then. Every run that gets that far re-encrypts state,
 so every push looks alike (Simon, 2026-11-26).
 
-Logs are one fixed line (`ok: N listings`, `skipped: recent fetch`, `failed: <ErrorType>`):
-the Action log is public, so no alert counts, titles, queue days or error text.
+Logs are one fixed line (`ok: N listings`, `skipped: recent fetch`, `failed: <ErrorType>`,
+then ` · bf ok: M` etc. for Bostadsförmedlingen): the Action log is public, so no alert counts,
+titles, queue days or error text. SSSB and BF run one after the other, each in its own try:
+a failure in one never stops the other's alerts, and each has its own guard and heartbeat.
 """
 
 import argparse
@@ -22,9 +24,11 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from housing_watch import bf
 from housing_watch.alerts import (
     GRACE,
     Alert,
+    bf_listing_alerts,
     digest_alert,
     dispatch,
     listing_alerts,
@@ -32,10 +36,25 @@ from housing_watch.alerts import (
     run_failed,
     run_ok,
 )
-from housing_watch.config import QueueDays, load_booked, load_config, load_queue_days
+from housing_watch.bf import (
+    BfDetail,
+    BfListing,
+    bf_deadline,
+    bf_get,
+    parse_bf_detail,
+    parse_bf_list,
+)
+from housing_watch.config import (
+    QueueDays,
+    load_bf_since,
+    load_booked,
+    load_config,
+    load_queue_days,
+)
 from housing_watch.crypto import decrypt, encrypt
-from housing_watch.history import deadline, open_db, record
+from housing_watch.history import bf_detail, bf_record, deadline, open_db, record
 from housing_watch.ntfy import make_send
+from housing_watch.rules import bf_worth_details
 from housing_watch.sssb import (
     Detail,
     Listing,
@@ -137,7 +156,48 @@ def pick_details(
     return (_rotate(urgent, now) + _rotate(near, now) + unknown)[:DETAIL_CAP]
 
 
-def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
+def pick_bf_details(
+    hist: sqlite3.Connection, listings: Sequence[BfListing], cfg, now: datetime
+) -> list[BfListing]:
+    """BF listings that need a detail page this run, by public facts only (bf_worth_details,
+    the list's deadline, the stored move-in): closing within 48 h → every run, the last-call
+    window first, rotated; never fetched → once; known move-in outside the window or closed →
+    never. At most DETAIL_CAP."""
+    urgent_by = timedelta(hours=cfg.last_call_hours) + GRACE
+    urgent: list[BfListing] = []
+    near: list[BfListing] = []
+    unknown: list[BfListing] = []
+    for x in sorted(listings, key=lambda x: x.id):
+        if not bf_worth_details(x, cfg):
+            continue
+        dl = bf_deadline(x.deadline)
+        d = bf_detail(hist, x.id)
+        if dl <= now or (d and not cfg.move_in_from <= d.move_in <= cfg.move_in_to):
+            continue
+        if dl <= now + urgent_by:
+            urgent.append(x)
+        elif dl <= now + LIVE_WINDOW:
+            near.append(x)
+        elif d is None:
+            unknown.append(x)
+    tier = cfg.bf.tier
+    unknown.sort(key=lambda x: (tier(x.municipality, x.district), x.floor == 0, x.rent, x.id))
+    return (_rotate(urgent, now) + _rotate(near, now) + unknown)[:DETAIL_CAP]
+
+
+def _watch_bf(hist, cfg, since, now, get, sleep) -> tuple[int, list]:
+    listings = parse_bf_list(get(bf.LIST_URL), now)
+    if not listings:
+        raise EmptyRun("0 BF listings parsed")
+    details: dict[str, BfDetail] = {}
+    for x in pick_bf_details(hist, listings, cfg, now):
+        sleep(PAUSE_S)
+        details[x.id] = parse_bf_detail(get(bf.detail_url(x)), x)
+    bf_record(hist, listings, details, now)
+    return len(listings), bf_listing_alerts(hist, cfg, since, frozenset(details), now)
+
+
+def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep, bf_since) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
         raise EmptyRun("0 listings parsed")
@@ -148,7 +208,7 @@ def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, l
     listings = [merge(x, details.get(x.id)) for x in listings]
     record(hist, listings, details, now)
     alerts = listing_alerts(hist, cfg, queue, booked, now)
-    alerts.append(digest_alert(hist, cfg, queue, booked, now))
+    alerts.append(digest_alert(hist, cfg, queue, booked, now, bf_since=bf_since))
     return len(listings), alerts
 
 
@@ -169,6 +229,7 @@ def run(
     env: Mapping[str, str],
     *,
     get: Callable[[str], str],
+    bf_get: Callable[[str], str] | None = None,
     send: Callable[[Alert], object],
     sleep: Callable[[float], object],
     now: datetime,
@@ -176,7 +237,9 @@ def run(
     test_alert: bool = False,
     config: Path = CONFIG,
 ) -> int:
-    """One scheduled run. Returns 0 (ok or skipped) or 1 (failed run, saved and ready).
+    """One scheduled run. Returns 0 (ok or skipped) or 1 (SSSB or BF failed, saved and ready).
+
+    `bf_get` fetches Bostadsförmedlingen; None leaves BF out (SSSB-only tests).
 
     Setup problems (config, secrets, key, missing or unexpected files, a shrinking history)
     raise instead, before `ready` exists, so nothing is pushed.
@@ -191,6 +254,7 @@ def run(
     cfg = load_config(config)
     queue = load_queue_days(env)
     booked = load_booked(env)
+    bf_since = load_bf_since(env)
     key = env.get("STATE_KEY")
     encrypt(b"", key)  # a bad key fails here, before any request
 
@@ -211,21 +275,42 @@ def run(
         hist, state = open_db(hist_p), open_state(state_p)
         try:
             before = _observations(hist)
-            failed: Exception | None = None
-            n = 0
-            last = _meta(state, "last_fetch")
-            if last and now - datetime.fromisoformat(last) < GUARD:
-                line = "skipped: recent fetch"
-            else:
-                _set_meta(state, "last_fetch", now.astimezone(UTC).isoformat())
+            alerts: list = []
+            failures: list[Exception] = []
+            parts: list[str] = []
+
+            def part(name, meta_key, label, work):
+                last = _meta(state, meta_key)
+                if last and now - datetime.fromisoformat(last) < GUARD:
+                    parts.append(f"{label}skipped: recent fetch")
+                    return
+                _set_meta(state, meta_key, now.astimezone(UTC).isoformat())
                 try:
-                    n, alerts = _watch(hist, cfg, queue, booked, now, get, sleep)
-                    run_ok(state)
+                    n, found = work()
+                    run_ok(state, source=name)
+                    alerts.extend(found)
+                    parts.append(f"{label}ok: {n}" + ("" if name else " listings"))
                 except Exception as e:  # noqa: BLE001 - every failure feeds the heartbeat
-                    failed = e
-                    alerts = [run_failed(state, now, f"{type(e).__name__}: {e}")]
-                dispatch(state, alerts, send, now)
-                line = f"failed: {type(failed).__name__}" if failed else f"ok: {n} listings"
+                    failures.append(e)
+                    alerts.append(run_failed(state, now, f"{type(e).__name__}: {e}", source=name))
+                    parts.append(f"{label}failed: {type(e).__name__}")
+
+            part(
+                "",
+                "last_fetch",
+                "",
+                lambda: _watch(hist, cfg, queue, booked, now, get, sleep, bf_since),
+            )
+            if bf_get is not None:
+                part(
+                    "bf",
+                    "bf_last_fetch",
+                    "bf ",
+                    lambda: _watch_bf(hist, cfg, bf_since, now, bf_get, sleep),
+                )
+            dispatch(state, alerts, send, now)
+            line = " · ".join(parts)
+            failed = failures[0] if failures else None
             if _observations(hist) < before:
                 raise RuntimeError("history shrank; not saving")
         finally:
@@ -249,6 +334,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.data,
             env,
             get=http_get,
+            bf_get=bf_get,
             send=make_send(env.get("NTFY_TOPIC", "")),
             sleep=time.sleep,
             now=datetime.now(UTC),

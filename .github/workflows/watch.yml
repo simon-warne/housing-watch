@@ -44,6 +44,7 @@ jobs:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           QUEUE_DAYS: ${{ secrets.QUEUE_DAYS }}
           QUEUE_DAYS_UNTIL: ${{ secrets.QUEUE_DAYS_UNTIL }}
+          BF_QUEUE_SINCE: ${{ secrets.BF_QUEUE_SINCE }}
           BOOKED_IDS: ${{ vars.BOOKED_IDS }}
           INIT: ${{ steps.data.outputs.init }}
         run: uv run --no-dev python -m housing_watch.run --data data ${INIT:+--init}
