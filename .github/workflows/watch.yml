@@ -1,0 +1,82 @@
+name: watch
+# Every 30 min at odd minutes (GitHub delays or drops top-of-hour runs, M0): fetch SSSB, record
+# history, send alerts (plan M4). The repo and its logs are public: secrets reach only the step
+# that needs them, through env, and the runner prints one fixed line.
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "Only send one test alert to the phone"
+        type: boolean
+        default: false
+permissions:
+  contents: write # force-push the data branch
+  actions: write # keep-alive: re-enable this workflow
+concurrency:
+  group: watch
+  cancel-in-progress: false
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked --no-dev
+
+      - name: Test alert
+        if: ${{ inputs.test_alert }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: uv run --no-dev python -m housing_watch.run --data data --test-alert
+
+      - name: Fetch data branch
+        id: data
+        if: ${{ !inputs.test_alert }}
+        run: scripts/fetch-data.sh data
+
+      - name: Watch
+        if: ${{ !inputs.test_alert }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          QUEUE_DAYS: ${{ secrets.QUEUE_DAYS }}
+          QUEUE_DAYS_UNTIL: ${{ secrets.QUEUE_DAYS_UNTIL }}
+          BOOKED_IDS: ${{ vars.BOOKED_IDS }}
+          INIT: ${{ steps.data.outputs.init }}
+        run: uv run --no-dev python -m housing_watch.run --data data ${INIT:+--init}
+
+      - name: Push data branch
+        # Also after a failed run (the failure streak must be saved); only if the runner wrote
+        # data/ready, i.e. everything was saved and re-encrypted.
+        if: ${{ always() && !inputs.test_alert }}
+        run: scripts/push-data.sh data
+
+      - name: Keep the schedule alive
+        # GitHub pauses schedules after 60 days without repo activity (M0).
+        if: ${{ always() && github.event_name == 'schedule' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh api -X PUT "repos/$REPO/actions/workflows/watch.yml/enable" --silent
+
+      - name: Weekly backup due?
+        id: backup
+        if: ${{ always() && !inputs.test_alert }}
+        run: |
+          due=false
+          if [ "$(date -u +%u%H)" = "703" ] && [ -f data/ready ]; then due=true; fi
+          echo "due=$due" >> "$GITHUB_OUTPUT"
+
+      - name: Weekly backup
+        if: ${{ always() && steps.backup.outputs.due == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-${{ github.run_id }}
+          path: |
+            data/history.sqlite
+            data/state.db.enc
+          retention-days: 90

@@ -1,0 +1,4 @@
+ok: 24 listings
+=========================== short test summary info ============================
+FAILED tests/test_run.py::test_higher_detail_top_suppresses_false_winnable - ...
+1 failed, 1 passed, 24 deselected in 0.09s

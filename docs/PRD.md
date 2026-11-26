@@ -43,12 +43,12 @@ Never miss an SSSB room I can win, and build my own data on how many queue days 
 Each alert: area, address, rent, move-in, top days vs mine, applicants, deadline, link. No duplicates for the same listing and state.
 
 ## 5. How it works
-- Python. Fetch the listings at most every 30 min, one request for all of them (detail requests only for listings that match, for their deadline), with a clear user-agent and pauses between requests.
+- Python. Fetch the listings at most every 30 min, one request for all of them (detail requests only for listings that match, for their deadline, and every run within 48 h of it for live top days, using the higher figure; Simon, 2026-11-26), with a clear user-agent and pauses between requests.
 - Parse into `Listing` (id, area, address, type, size, rent, flags, move-in, deadline, top_days, applicants, seen_at).
 - SQLite history: every observation is kept; changes and new listings are detected by comparing with the last run. Every alert sent is logged too (this is the record of what I was told and when), in a separate `state.db` that is encrypted before it is committed, since alerts reveal my queue days and booked listings (Simon, 2026-11-26).
 - Rules engine reads `config.yaml`, computes my queue days, decides alerts.
 - Notifications via **ntfy** (decided by Simon, 26 Nov; secret topic in a GitHub secret). The ntfy app keeps its own history; the database is the real record.
-- Runs on **GitHub Actions** on a schedule. Public repo (Simon, 2026-11-26), so minutes are unlimited. Scheduled runs at odd minutes (GitHub delays or drops top-of-hour runs) and an explicit keep-alive for the 60-day pause (M0). The SQLite database lives on a separate `data` branch, committed only when something changed (Simon, 2026-11-26).
+- Runs on **GitHub Actions** on a schedule. Public repo (Simon, 2026-11-26), so minutes are unlimited. Scheduled runs at odd minutes (GitHub delays or drops top-of-hour runs) and an explicit keep-alive for the 60-day pause (M0). The SQLite database lives on a separate `data` branch (Simon, 2026-11-26). That branch is a single commit, replaced every run, holding `history.sqlite` and `state.db` re-encrypted with a fresh nonce, so push timing reveals nothing about alerts; a weekly artifact backs it up (Simon, 2026-11-26).
 
 ## 6. Milestones
 Each ends with its acceptance tests green, a short report with evidence in `docs/reports/`, and a tag.

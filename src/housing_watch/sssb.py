@@ -8,6 +8,8 @@ so a layout change on SSSB's side is loud, never silent zeros.
 import json
 import math
 import re
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -16,6 +18,12 @@ from zoneinfo import ZoneInfo
 LISTINGS_KEY = "objektlistabilder@lagenheter"
 TOTAL_KEY = "objektsummering-TOTAL@lagenheter"
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
+
+# --- fetching (M4): GET only, SSSB's widget endpoint only, a clear user-agent ---
+WIDGETS = "https://minasidor.sssb.se/widgets/"
+USER_AGENT = "housing-watch/0.1 (+github.com/simon-warne/housing-watch)"
+TIMEOUT_S = 30
+_HOST = "minasidor.sssb.se"
 
 _JSONP = re.compile(r"\s*[A-Za-z_$][\w$]*\((.*)\)\s*;?\s*", re.DOTALL)
 _RENT = re.compile(r"[1-9]\d{0,2}(?:[ \xa0]\d{3})*")
@@ -250,3 +258,44 @@ def parse_detail(payload: dict, expected_id: str) -> Detail:
     if not m or int(m.group(1)) == 0 or int(m.group(2)) == 0:
         raise ParseError("objektintressestatus", status, expected_id)
     return Detail(deadline=deadline, applicants=int(m.group(1)), top_days=int(m.group(2)))
+
+
+def _widgets_url(params: list[tuple[str, str]]) -> str:
+    return WIDGETS + "?" + urllib.parse.urlencode(params)
+
+
+def list_url() -> str:
+    """All listings plus the TOTAL count, in one request (M0)."""
+    return _widgets_url(
+        [
+            ("callback", "cb"),
+            ("widgets[]", "objektsummering@lagenheter"),
+            ("widgets[]", LISTINGS_KEY),
+        ]
+    )
+
+
+def detail_url(listing: Listing) -> str:
+    """The detail widgets (deadline, live status) for a listing, by the refid in its detaljUrl."""
+    u = urllib.parse.urlsplit(listing.detail_url)
+    refids = urllib.parse.parse_qs(u.query).get("refid", [])
+    if u.hostname != _HOST or len(refids) != 1 or not re.fullmatch(r"[0-9A-Za-z]+", refids[0]):
+        raise ValueError(f"unexpected detaljUrl for {listing.id}")
+    return _widgets_url(
+        [
+            ("refid", refids[0]),
+            ("callback", "cb"),
+            ("widgets[]", "objektinformation@lagenheter"),
+            ("widgets[]", "objektintresse"),
+            ("widgets[]", "objektintressestatus"),
+        ]
+    )
+
+
+def http_get(url: str, *, opener=urllib.request.urlopen) -> str:
+    """A plain GET to SSSB's widget endpoint (never anything else), decoded as text."""
+    if not url.startswith(WIDGETS + "?"):
+        raise ValueError("http_get only fetches SSSB's widget endpoint")
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT}, method="GET")
+    with opener(req, timeout=TIMEOUT_S) as resp:
+        return resp.read().decode(resp.headers.get_content_charset() or "utf-8")

@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "Watch SSSB listings and alert when a room is winnable with my queue days."
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography>=44",
     "pyyaml>=6.0.4",
 ]
 
