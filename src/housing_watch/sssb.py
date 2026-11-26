@@ -6,6 +6,7 @@ so a layout change on SSSB's side is loud, never silent zeros.
 """
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -18,10 +19,11 @@ STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 _JSONP = re.compile(r"\s*[A-Za-z_$][\w$]*\((.*)\)\s*;?\s*", re.DOTALL)
 _RENT = re.compile(r"[1-9]\d{0,2}(?:[ \xa0]\d{3})*")
-_FLOOR = re.compile(r"\d{1,3}")
+_FLOOR = re.compile(r"[1-9]\d{0,2}")
 _INTEREST = re.compile(r"(\d+) \((\d+)st\)")
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _DEADLINE = re.compile(r"Kan bokas till (\d{4}-\d{2}-\d{2}) klockan (\d{2}:\d{2})")
+_OBJEKT_NR = re.compile(r'<dd class="ObjektNummer">\s*([^<\s]+)\s*</dd>')
 _STATUS = re.compile(
     r"bokats av (\d+) person(?:er)?, varav den med flest ködagar just nu har (\d+) ködagar"
 )
@@ -68,12 +70,16 @@ def load_jsonp(text: str) -> dict:
     if not m:
         raise ParseError("jsonp", (text or "")[:80], why="not a JSONP response")
     try:
-        payload = json.loads(m.group(1))
-    except json.JSONDecodeError as e:
+        payload = json.loads(m.group(1), parse_constant=_reject_constant)
+    except (json.JSONDecodeError, ValueError) as e:
         raise ParseError("jsonp", m.group(1)[:80], why=str(e)) from None
     if not isinstance(payload, dict):
         raise ParseError("jsonp", type(payload).__name__, why="expected an object")
     return payload
+
+
+def _reject_constant(name: str):
+    raise ValueError(f"{name} is not a valid number")
 
 
 def parse_rent(raw: Any) -> int:
@@ -150,8 +156,17 @@ def _listing(item: Any, seen_at: datetime) -> Listing:
         raise ParseError(LISTINGS_KEY, type(item).__name__, why="listing is not an object")
     nr = _str(item, "objektNr", None)
     size = item.get("yta")
-    if isinstance(size, bool) or not isinstance(size, int | float) or size <= 0:
+    if (
+        isinstance(size, bool)
+        or not isinstance(size, int | float)
+        or not math.isfinite(size)
+        or size <= 0
+    ):
         raise ParseError("yta", size, nr)
+    if item.get("hyraEnhet") != "kr":
+        raise ParseError("hyraEnhet", item.get("hyraEnhet"), nr, why="expected kr")
+    if not str(item.get("hyraLabel") or "").startswith("Månadshyra"):
+        raise ParseError("hyraLabel", item.get("hyraLabel"), nr, why="expected monthly rent")
     url = _str(item, "detaljUrl", nr)
     if "refid=" not in url:
         raise ParseError("detaljUrl", url, nr, why="no refid")
@@ -202,21 +217,36 @@ def parse_list(payload: dict, seen_at: datetime, *, check_total: bool = True) ->
     if check_total:
         html = payload.get("html")
         total = html.get(TOTAL_KEY) if isinstance(html, dict) else None
-        if not isinstance(total, str) or not total.isdigit():
+        if not isinstance(total, str) or not re.fullmatch(r"[0-9]+", total):
             raise ParseError(TOTAL_KEY, total)
         if int(total) != len(listings):
             raise ParseError(TOTAL_KEY, total, why=f"parsed {len(listings)} listings")
     return listings
 
 
-def parse_detail(payload: dict) -> Detail:
-    """Deadline and live booking status from the detail widgets."""
+def parse_detail(payload: dict, expected_id: str) -> Detail:
+    """Deadline and live booking status from the detail widgets.
+
+    `expected_id` is the objektNr of the listing whose detaljUrl was fetched; the response must
+    be about that object (refids are opaque). An empty or missing status means nobody has
+    booked yet (same assumption as the list's antalIntresse, plan M1).
+    """
     html = payload.get("html") if isinstance(payload, dict) else None
     if not isinstance(html, dict):
-        raise ParseError("html", type(html).__name__, why="detail html missing")
-    deadline = parse_deadline(html.get("objektintresse"))
+        raise ParseError("html", type(html).__name__, expected_id, why="detail html missing")
+    info = html.get("objektinformation@lagenheter")
+    m = _OBJEKT_NR.search(info) if isinstance(info, str) else None
+    if not m or m.group(1) != expected_id:
+        got = m.group(1) if m else None
+        raise ParseError("objektinformation@lagenheter", got, expected_id, why="wrong object")
+    try:
+        deadline = parse_deadline(html.get("objektintresse"))
+    except ParseError as e:
+        raise ParseError("objektintresse", e.raw, expected_id) from e
     status = html.get("objektintressestatus")
+    if status is None or (isinstance(status, str) and not status.strip()):
+        return Detail(deadline=deadline, applicants=0, top_days=None)
     m = _STATUS.search(status) if isinstance(status, str) else None
-    if not m:
-        raise ParseError("objektintressestatus", status)
+    if not m or int(m.group(1)) == 0 or int(m.group(2)) == 0:
+        raise ParseError("objektintressestatus", status, expected_id)
     return Detail(deadline=deadline, applicants=int(m.group(1)), top_days=int(m.group(2)))

@@ -132,7 +132,7 @@ def test_bad_rent_raises(raw):
         parse_rent(raw)
 
 
-@pytest.mark.parametrize("raw", ["Källare", "", None, "-1", "1.5", 1])
+@pytest.mark.parametrize("raw", ["Källare", "", None, "-1", "1.5", 1, "0", "007"])
 def test_bad_floor_raises(raw):
     with pytest.raises(ParseError):
         parse_floor(raw)
@@ -169,6 +169,11 @@ _DELETE = object()
         ("yta", "16"),
         ("yta", 0),
         ("yta", True),
+        ("yta", float("nan")),
+        ("yta", float("inf")),
+        ("hyraEnhet", "kr/år"),
+        ("hyraEnhet", None),
+        ("hyraLabel", "Årshyra:"),
         ("inflyttningDatum", "16 dec"),
         ("publiceratDatum", None),
         ("egenskaper", "Max 4 år"),
@@ -202,7 +207,7 @@ def test_total_mismatch_raises(listing_payload):
         parse_list(p, SEEN)
 
 
-@pytest.mark.parametrize("total", ["tjugofyra", None, ""])
+@pytest.mark.parametrize("total", ["tjugofyra", None, "", "²", "-1"])
 def test_bad_total_raises(listing_payload, total):
     p = copy.deepcopy(listing_payload)
     p["html"][TOTAL_KEY] = total
@@ -217,7 +222,14 @@ def test_naive_seen_at_raises(listing_payload):
 
 @pytest.mark.parametrize(
     "text",
-    ["<!DOCTYPE html><html><body>Fel</body></html>", "", "cb(not json);", "cb([1, 2]);"],
+    [
+        "<!DOCTYPE html><html><body>Fel</body></html>",
+        "",
+        "cb(not json);",
+        "cb([1, 2]);",
+        'cb({"yta": NaN});',
+        'cb({"yta": Infinity});',
+    ],
 )
 def test_not_jsonp_raises(text):
     with pytest.raises(ParseError):
@@ -240,22 +252,35 @@ def test_empty_list_with_total_check_raises():
 
 
 # 6. Detail
+NR = "5102-3203-028"
+
+
 def test_detail_fixture(detail_payload):
-    assert parse_detail(detail_payload) == Detail(
+    assert parse_detail(detail_payload, NR) == Detail(
         deadline=datetime(2026, 11, 30, 16, 0, tzinfo=STHLM), applicants=5, top_days=132
     )
 
 
-def test_detail_one_person():
-    p = {
-        "html": {
-            "objektintresse": "Kan bokas till 2027-06-01 klockan 09:30.",
-            "objektintressestatus": "Denna bostad har bokats av 1 person, varav den med "
-            "flest ködagar just nu har 7 ködagar.",
-        }
-    }
-    assert parse_detail(p) == Detail(
+def test_detail_one_person(detail_payload):
+    p = copy.deepcopy(detail_payload)
+    p["html"]["objektintresse"] = "Kan bokas till 2027-06-01 klockan 09:30."
+    p["html"]["objektintressestatus"] = (
+        "Denna bostad har bokats av 1 person, varav den med flest ködagar just nu har 7 ködagar."
+    )
+    got = parse_detail(p, NR)
+    assert got == Detail(
         deadline=datetime(2027, 6, 1, 9, 30, tzinfo=STHLM), applicants=1, top_days=7
+    )
+    assert got.deadline.utcoffset().total_seconds() == 7200  # summer time
+
+
+@pytest.mark.parametrize("status", [None, "", "  "])
+def test_detail_nobody_booked(detail_payload, status):
+    # Assumption (plan M1): no bookings shows as an empty status. Deadline must survive.
+    p = copy.deepcopy(detail_payload)
+    p["html"]["objektintressestatus"] = status
+    assert parse_detail(p, NR) == Detail(
+        deadline=datetime(2026, 11, 30, 16, 0, tzinfo=STHLM), applicants=0, top_days=None
     )
 
 
@@ -266,19 +291,28 @@ def test_detail_one_person():
         ("objektintresse", "Kan bokas till 2026-13-40 klockan 16:00."),
         ("objektintresse", None),
         ("objektintressestatus", "Denna bostad har bokats av flera personer."),
-        ("objektintressestatus", None),
+        ("objektintressestatus", "Ingen har bokat denna bostad."),
+        ("objektintressestatus", 5),
+        ("objektinformation@lagenheter", None),
+        ("objektinformation@lagenheter", "<dl></dl>"),
     ],
 )
 def test_detail_layout_change_raises(detail_payload, key, value):
     p = copy.deepcopy(detail_payload)
     p["html"][key] = value
     with pytest.raises(ParseError):
-        parse_detail(p)
+        parse_detail(p, NR)
+
+
+def test_detail_for_other_listing_raises(detail_payload):
+    with pytest.raises(ParseError) as exc:
+        parse_detail(detail_payload, "6202-1203-001")
+    assert exc.value.raw == NR
 
 
 def test_detail_missing_html_raises():
     with pytest.raises(ParseError):
-        parse_detail({"data": {}})
+        parse_detail({"data": {}}, NR)
 
 
 def test_fixture_is_valid_json_after_strip():
