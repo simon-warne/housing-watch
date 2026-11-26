@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from housing_watch.history import Changes, latest, open_db, record
+from housing_watch.history import Changes, deadline, latest, open_db, record
 from housing_watch.sssb import Detail, load_jsonp, parse_detail, parse_list
 
 FIX = Path(__file__).parent / "fixtures"
@@ -211,3 +211,60 @@ def test_alerts_table_unique(db, listings):
     conn.execute(sql, row)
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(sql, row)
+
+
+# Review fixes
+def test_heartbeat_alerts_dedupe_with_null_listing(db):
+    _, conn = db
+    row = (None, "heartbeat", "3-fails", T0.isoformat(), "msg")
+    sql = "INSERT INTO alerts (listing_id, kind, state_key, sent_at, message) VALUES (?,?,?,?,?)"
+    conn.execute(sql, row)
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(sql, row)
+
+
+def test_deadline_readable(db, listings, detail):
+    _, conn = db
+    record(conn, listings, {DETAIL_ID: detail}, T0)
+    assert deadline(conn, DETAIL_ID) == detail.deadline
+    assert deadline(conn, listings[1].id) is None
+    assert deadline(conn, "0000-0000-000") is None
+
+
+def test_reappearing_listing_drops_stale_deadline(db, listings, detail):
+    _, conn = db
+    record(conn, listings, {DETAIL_ID: detail}, T0)
+    record(conn, at([x for x in listings if x.id != DETAIL_ID], T1), {}, T1)
+    ch = record(conn, at(listings, T2), {}, T2)
+    assert DETAIL_ID in [x.id for x in ch.new]
+    assert deadline(conn, DETAIL_ID) is None
+
+
+def test_listing_seen_at_must_match_run(db, listings):
+    _, conn = db
+    with pytest.raises(ValueError):
+        record(conn, listings, {}, T1)
+
+
+def test_same_page_again_across_reopen(tmp_path, listings):
+    path = tmp_path / "h.sqlite"
+    conn = open_db(path)
+    record(conn, listings, {}, T0)
+    conn.close()
+    before = path.read_bytes()
+    conn = open_db(path)
+    ch = record(conn, at(listings, T1), {}, T1)
+    conn.close()
+    assert ch.unchanged == 24 and path.read_bytes() == before
+
+
+def test_error_mid_run_rolls_back(db, listings, monkeypatch):
+    path, conn = db
+    record(conn, listings, {}, T0)
+    before = path.read_bytes()
+    nxt = at(listings, T1)
+    nxt[0] = replace(nxt[0], top_days=777)
+    nxt[5] = replace(nxt[5], rent=None)  # not storable: NOT NULL
+    with pytest.raises(sqlite3.IntegrityError):
+        record(conn, nxt, {}, T1)
+    assert path.read_bytes() == before and latest(conn, listings[0].id) == listings[0]

@@ -1,16 +1,16 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-26, end of M1 (parser). Reports: `docs/reports/M0.md`, `docs/reports/M1.md`.
+Updated: 2026-11-26, end of M2 (history). Reports: `docs/reports/M0.md`, `M1.md`, `M2.md`.
 
 ## Where things stand
-- M0 done, tagged `m0` and pushed. SSSB listings come logged out from `GET /widgets/?…widgets[]=objektlistabilder@lagenheter` (JSONP): all listings in one request, queue days included (`antalIntresse`). Deadline comes from the detail widget `objektintresse`.
-- Fixtures in `tests/fixtures/` (list, empty list, detail), documented in its README.
-- Decided: DB on a `data` branch; booked IDs in repo variable `BOOKED_IDS`; PRD §2/§5/§9 updated.
-- ntfy from Actions verified: `ntfy-test` (manual only) delivered to Simon's phone in ~3–5 s.
-- M1 done, tagged `m1` (not pushed yet): `src/housing_watch/sssb.py` parses list and detail into `Listing`/`Detail`, strict (`ParseError`, never silent zeros); 92 tests on fixtures; fresh-subagent review's 6 findings fixed.
+- M0 done (`m0`, pushed). SSSB listings come logged out from `GET /widgets/?…widgets[]=objektlistabilder@lagenheter` (JSONP), all in one request, queue days included. The deadline comes from the detail widget `objektintresse`.
+- M1 done (`m1`, pushed). `src/housing_watch/sssb.py` parses into `Listing`/`Detail`, strictly.
+- M2 done (`m2`, **not pushed**). `src/housing_watch/history.py` writes SQLite with change-only observations, so an unchanged run leaves the file byte-identical. It detects new, changed and removed listings. The deadline joins by id and carries forward. The empty-list guard means 0 listings removes nothing. The `alerts` table already has its dedupe index. 114 tests pass.
 
 ## Next, in order
-1. Simon pushes `main` and the `m1` tag.
-2. M2 history in a fresh session (plan mode): SQLite schema (observations + alerts), new/changed/removed detection, re-running the same page changes nothing; join `Detail` (deadline) by id; DB on the `data` branch.
+1. Simon pushes `main` and the `m2` tag.
+2. M3 rules and alerts in a fresh session (plan mode): `config.yaml`, my queue days (from a secret/variable, never committed), the five alerts in PRD §4, dedupe through `alerts`, and a look from Simon at the alert wording.
+   - Use `Changes` from `record()`, plus `latest()` and `deadline()`.
+   - A deadline-only change shows up as an `(old, new)` pair that is equal apart from `seen_at`: read `deadline()`.
 
 ## Open for Simon
 - Nothing.
@@ -21,5 +21,7 @@ Updated: 2026-11-26, end of M1 (parser). Reports: `docs/reports/M0.md`, `docs/re
 - ntfy's reply echoes the topic: send its output to /dev/null in Actions.
 - Pushing from Claude is blocked by the permission check; Simon pushes.
 - No `gitleaks` locally (CI runs it).
-- `hyra` uses a non-breaking space (`\xa0`). `parse_detail` needs the listing's objektNr: refids are opaque and the login link inside carries a different refid.
-- Unbooked listings: shape guessed (empty status). Unknown text raises on purpose; fix when a real one appears.
+- `hyra` uses a non-breaking space (`\xa0`). `parse_detail` needs the listing's objektNr.
+- Unbooked listings: shape guessed (empty status). Unknown text raises on purpose.
+- SQLite UNIQUE treats NULLs as distinct: dedupe uses a `COALESCE` index.
+- `record()` needs every `Listing.seen_at` equal to the run's `seen_at` (parse with the same timestamp).

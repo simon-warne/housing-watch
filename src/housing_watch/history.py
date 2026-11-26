@@ -47,9 +47,11 @@ CREATE TABLE IF NOT EXISTS alerts (
     kind       TEXT NOT NULL,
     state_key  TEXT NOT NULL,
     sent_at    TEXT NOT NULL,
-    message    TEXT NOT NULL,
-    UNIQUE (listing_id, kind, state_key)
+    message    TEXT NOT NULL
 );
+-- COALESCE: a plain UNIQUE treats NULLs as distinct, so heartbeat alerts would never dedupe.
+CREATE UNIQUE INDEX IF NOT EXISTS alerts_dedupe
+    ON alerts (COALESCE(listing_id, ''), kind, state_key);
 """
 
 # Columns compared to decide "changed" (everything but id, listing_id, seen_at).
@@ -139,6 +141,12 @@ def latest(conn: sqlite3.Connection, id_: str) -> Listing | None:
     return _listing(row) if row else None
 
 
+def deadline(conn: sqlite3.Connection, id_: str) -> datetime | None:
+    """The listing's latest known booking deadline (UTC), or None if never fetched."""
+    row = _latest_row(conn, id_)
+    return datetime.fromisoformat(row["deadline"]) if row and row["deadline"] else None
+
+
 def _insert(conn: sqlite3.Connection, id_: str, seen: str, state: dict) -> None:
     cols = ["listing_id", "seen_at", *STATE_COLS]
     marks = ", ".join("?" for _ in cols)
@@ -155,13 +163,16 @@ def record(
     """Store one run's listings and return what changed since the previous run.
 
     `details` holds the detail pages fetched this run, by listing id; a listing without one
-    keeps its last known deadline. An empty `listings` is treated as a failed run (PRD §4
-    heartbeat): nothing is written or removed.
+    keeps its last known deadline (unless it was removed in between: a re-listing starts with
+    no deadline). An empty `listings` is treated as a failed run (PRD §4 heartbeat): nothing
+    is written or removed. Every listing's `seen_at` must equal `seen_at`.
     """
     seen = _ts(seen_at)
     ids = [x.id for x in listings]
     if len(set(ids)) != len(ids):
         raise ValueError("duplicate listing ids")
+    if any(x.seen_at != seen_at for x in listings):
+        raise ValueError("listing seen_at differs from the run's seen_at")
     unknown = set(details) - set(ids)
     if unknown:
         raise ValueError(f"details for listings not in this run: {sorted(unknown)}")
@@ -176,10 +187,12 @@ def record(
         for x in listings:
             prev = _latest_row(conn, x.id)
             if x.id in details:
-                deadline = _ts(details[x.id].deadline)
+                dl = _ts(details[x.id].deadline)
+            elif x.id in active and prev is not None:
+                dl = prev["deadline"]
             else:
-                deadline = prev["deadline"] if prev else None
-            state = _state(x, deadline)
+                dl = None
+            state = _state(x, dl)
             if x.id not in active:
                 conn.execute(
                     "INSERT INTO listings (id, first_seen) VALUES (?, ?) "
