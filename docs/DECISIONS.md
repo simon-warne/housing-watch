@@ -8,3 +8,4 @@ One line each, newest last: `YYYY-MM-DD · decision · why · (Simon | Claude, r
 - 2026-11-26 · Public GitHub repo · unlimited Actions minutes (private ≈1,440 of 2,000 free min/month at 48 runs/day); SSSB data is public; ntfy topic, my queue days and booked listings live in GitHub secrets/variables, never in committed files or history (PRD §9.2) · (Simon)
 - 2026-11-26 · Hooks: ruff format + check after Python edits; pytest on Stop · must-always checks are deterministic, not reminders · (Simon)
 - 2026-11-26 · Tooling: Python 3.14 with uv, pytest, ruff; CI = ruff, pytest, gitleaks · S-size defaults from code-setup §2 · (Claude, reversible)
+- 2026-11-26 · M0 plan approved (docs/plans/M0.md) · reconnaissance before any product code · (Simon)

@@ -1,0 +1,16 @@
+2026-11-26T17:16:02Z GET https://minasidor.sssb.se/lediga-bostader/?pagination=0&paginationantal=10 -> 200 76092 text/html; charset=UTF-8
+2026-11-26T17:16:14Z GET https://minasidor.sssb.se/wp-content/themes/fast2/client/behavior/compressed.js -> 200 172243 application/javascript
+2026-11-26T17:16:28Z GET https://minasidor.sssb.se/wp-content/plugins/f2-plugin-core/inc/f2.widget.js -> 200 4379 application/javascript
+2026-11-26T17:16:37Z GET https://minasidor.sssb.se/assets/javascripts/widgets.min.js -> 200 16297 application/javascript;charset=utf-8
+2026-11-26T17:16:49Z GET https://minasidor.sssb.se/widgets/?pagination=0&paginationantal=10&callback=cb&widgets%5B%5D=objektsummering%40lagenheter&widgets%5B%5D=objektlistabilder%40lagenheter -> 200 64492 text/javascript;charset=utf-8
+2026-11-26T17:17:09Z GET https://minasidor.sssb.se/widgets/?pagination=1&paginationantal=10&callback=cb&widgets%5B%5D=objektlistabilder%40lagenheter -> 200 62334 text/javascript;charset=utf-8
+2026-11-26T17:17:14Z GET https://minasidor.sssb.se/widgets/?pagination=5&paginationantal=10&callback=cb&widgets%5B%5D=objektlistabilder%40lagenheter -> 200 62334 text/javascript;charset=utf-8
+2026-11-26T17:17:27Z GET https://minasidor.sssb.se/widgets/?omr=NOSUCHAREA&callback=cb&widgets%5B%5D=objektsummering%40lagenheter&widgets%5B%5D=objektlistabilder%40lagenheter -> 200 64492 text/javascript;charset=utf-8
+2026-11-26T17:17:33Z GET https://minasidor.sssb.se/lediga-bostader/lagenhet/?refid=59346d4b4c6d72334639635355527562445a55345766746a4e2f4a50586974415070374749384b4d5752553d -> 200 74607 text/html; charset=UTF-8
+2026-11-26T17:17:45Z GET https://minasidor.sssb.se/widgets/?refid=59346d4b4c6d72334639635355527562445a55345766746a4e2f4a50586974415070374749384b4d5752553d&callback=cb&widgets%5B%5D=objektinformation%40lagenheter&widgets%5B%5D=objektintresse&widgets%5B%5D=objektintressestatus -> 200 4597 text/javascript;charset=utf-8
+2026-11-26T17:18:06Z GET https://minasidor.sssb.se/widgets/?callback=cb&widgets%5B%5D=objektfilter%40lagenheter -> 200 7529 text/javascript;charset=utf-8
+2026-11-26T17:18:15Z GET https://minasidor.sssb.se/widgets/?hyraMax=1&callback=cb&widgets%5B%5D=objektsummering%40lagenheter&widgets%5B%5D=objektlistabilder%40lagenheter -> 200 2425 text/javascript;charset=utf-8
+2026-11-26T17:18:26Z GET https://minasidor.sssb.se/robots.txt -> 200 118 text/plain; charset=utf-8
+2026-11-26T17:18:42Z GET https://sssb.se/robots.txt -> 200 112 text/plain; charset=utf-8
+2026-11-26T17:18:47Z GET https://sssb.se/koregler/ -> 200 98716 text/html; charset=UTF-8
+2026-11-26T17:18:52Z GET https://www.sssb.se/cookies/ -> 200 92270 text/html; charset=UTF-8
