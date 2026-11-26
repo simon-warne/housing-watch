@@ -1,0 +1,9 @@
+2026-11-26T19:33:34Z GET https://bostad.stockholm.se/robots.txt 404 39333B text/html; charset=utf-8
+2026-11-26T19:33:39Z GET https://bostad.stockholm.se/bostad 200 36529B text/html; charset=utf-8
+2026-11-26T19:33:51Z GET https://bostad.stockholm.se/bostad/ 200 36529B text/html; charset=utf-8
+2026-11-26T19:33:56Z GET https://bostad.stockholm.se/AllaAnnonser/ 200 700066B application/json; charset=utf-8
+2026-11-26T19:34:21Z GET https://bostad.stockholm.se/bostad/202619429/ 200 69351B text/html; charset=utf-8
+2026-11-26T19:34:26Z GET https://bostad.stockholm.se/bostad/202618022/ 200 63683B text/html; charset=utf-8
+2026-11-26T19:34:31Z GET https://bostad.stockholm.se/bostad/202601471/ 200 72425B text/html; charset=utf-8
+2026-11-26T19:35:15Z GET https://bostad.stockholm.se/sa-gar-det-till/regler/Regler/ 200 57487B text/html; charset=utf-8
+2026-11-26T19:35:20Z GET https://bostad.stockholm.se/sa-gar-det-till/regler/avhopp/ 200 43662B text/html; charset=utf-8
