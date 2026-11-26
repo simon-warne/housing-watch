@@ -13,6 +13,7 @@ from enum import StrEnum
 from housing_watch.bf import BfDetail, BfListing
 from housing_watch.config import Config
 from housing_watch.fv import FvDetail, FvListing
+from housing_watch.sbs import SbsListing
 from housing_watch.sssb import Listing
 
 
@@ -246,3 +247,31 @@ def fv_rank_key(v: FvVerdict) -> tuple:
 def fv_ranked(verdicts: Iterable[FvVerdict]) -> list[FvVerdict]:
     """Best first: ground floor last, then lower rent (one area tier)."""
     return sorted(verdicts, key=fv_rank_key)
+
+
+# --- SBS (M6): digest only, no competition figure (Simon, 2026-11-26) ---
+@dataclass(frozen=True)
+class SbsVerdict:
+    listing: SbsListing
+    watched: bool  # rooms in cfg.sbs.rooms ("1 rum", "Korridor"); else "other type"
+    over_budget: bool  # rent > rent.max; no stretch (Spånga/Bromsten)
+    short_term: bool  # a Korttid… tag
+    window: str  # "in", "early", "late" or "agreement" (Enligt överenskommelse)
+
+
+def sbs_classify(x: SbsListing, cfg: Config) -> SbsVerdict:
+    if x.move_in is None:
+        window = "agreement"
+    elif x.move_in < cfg.move_in_from:
+        window = "early"
+    elif x.move_in > cfg.move_in_to:
+        window = "late"
+    else:
+        window = "in"
+    return SbsVerdict(
+        listing=x,
+        watched=x.rooms.casefold() in (r.casefold() for r in cfg.sbs.rooms),
+        over_budget=x.rent > cfg.rent_max,
+        short_term=x.tag.casefold().startswith("korttid"),
+        window=window,
+    )

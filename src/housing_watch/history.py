@@ -711,7 +711,8 @@ def _sbs_listing(row: sqlite3.Row) -> SbsListing:
 
 def _sbs_rows(conn: sqlite3.Connection, where: str, args: tuple) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT o.*, l.removed_at FROM sbs_listings l JOIN sbs_observations o ON o.id = "
+        "SELECT o.*, l.first_seen, l.removed_at FROM sbs_listings l "
+        "JOIN sbs_observations o ON o.id = "
         "(SELECT MAX(id) FROM sbs_observations WHERE listing_id = l.id) "
         f"WHERE {where} ORDER BY l.id",
         args,
@@ -724,10 +725,16 @@ def sbs_active(conn: sqlite3.Connection) -> list[SbsListing]:
 
 def sbs_seen_since(
     conn: sqlite3.Connection, since: datetime
-) -> list[tuple[SbsListing, datetime | None]]:
+) -> list[tuple[SbsListing, datetime, datetime | None]]:
+    """(listing, first_seen, removed_at) for listings active at or after `since`. first_seen
+    is when this listing (re-)appeared: a re-listing starts again."""
     rows = _sbs_rows(conn, "l.removed_at IS NULL OR l.removed_at >= ?", (_ts(since),))
     return [
-        (_sbs_listing(r), datetime.fromisoformat(r["removed_at"]) if r["removed_at"] else None)
+        (
+            _sbs_listing(r),
+            datetime.fromisoformat(r["first_seen"]),
+            datetime.fromisoformat(r["removed_at"]) if r["removed_at"] else None,
+        )
         for r in rows
     ]
 
@@ -766,7 +773,8 @@ def sbs_record(
             if x.id not in act:
                 conn.execute(
                     "INSERT INTO sbs_listings (id, first_seen) VALUES (?, ?) "
-                    "ON CONFLICT(id) DO UPDATE SET removed_at = NULL",
+                    "ON CONFLICT(id) DO UPDATE SET removed_at = NULL, "
+                    "first_seen = excluded.first_seen",
                     (x.id, seen),
                 )
                 conn.execute(insert, values)

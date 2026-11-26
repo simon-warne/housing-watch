@@ -105,6 +105,9 @@ def test_removed_and_relisted(conn, sbs0):
     assert NEK not in {x.id for x in sbs_active(conn)}
     ch = sbs_record(conn, at(sbs0, T2), T2)
     assert [x.id for x in ch.new] == [NEK]
+    # A re-listing is new again (its digest line says "new").
+    first = {x.id: f for x, f, _ in sbs_seen_since(conn, T0)}
+    assert first[NEK] == T2 and first["nekvagen-35-41-2"] == T0
 
 
 def test_empty_list_removes_nothing(conn, sbs0):
@@ -116,9 +119,9 @@ def test_empty_list_removes_nothing(conn, sbs0):
 def test_seen_since_includes_removed(conn, sbs0):
     sbs_record(conn, sbs0, T0)
     sbs_record(conn, at([x for x in sbs0 if x.id != NEK], T1), T1)
-    rows = {x.id: removed for x, removed in sbs_seen_since(conn, T0)}
-    assert rows[NEK] == T1 and rows["nekvagen-35-41-2"] is None
-    assert NEK not in {x.id for x, _ in sbs_seen_since(conn, T1 + timedelta(seconds=1))}
+    rows = {x.id: (first, removed) for x, first, removed in sbs_seen_since(conn, T0)}
+    assert rows[NEK] == (T0, T1) and rows["nekvagen-35-41-2"] == (T0, None)
+    assert NEK not in {x.id for x, _, _ in sbs_seen_since(conn, T1 + timedelta(seconds=1))}
 
 
 def test_guards(conn, sbs0):

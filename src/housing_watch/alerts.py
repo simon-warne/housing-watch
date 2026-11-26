@@ -25,6 +25,7 @@ from housing_watch.history import (
     bf_seen_since,
     fv_active,
     fv_seen_since,
+    sbs_seen_since,
     seen_since,
 )
 from housing_watch.rules import (
@@ -42,6 +43,7 @@ from housing_watch.rules import (
     fv_classify,
     fv_rank_key,
     rank_key,
+    sbs_classify,
 )
 from housing_watch.sssb import STOCKHOLM, Listing
 
@@ -301,9 +303,10 @@ def digest_alert(
         lines.append(f"{late} more after the move-in window")
     rest = [_digest_line(v, removed, booked, cfg) for v, removed in shown]
     fv_head, fv_lines, fv_title = _fv_digest(hist, cfg, _fv_mine(fv_points, now), since)
+    sbs_head, sbs_lines, sbs_title = _sbs_digest(hist, cfg, since)
     bf_head, bf_lines, bf_title = _bf_digest(hist, cfg, bf_since, since)
-    lines += fv_head + bf_head
-    rest += fv_lines + bf_lines
+    lines += fv_head + sbs_head + bf_head
+    rest += fv_lines + sbs_lines + bf_lines
     while rest:
         line = rest.pop(0)
         more = f"+{len(rest) + 1} more"
@@ -319,6 +322,7 @@ def digest_alert(
         priority="low",
         title=f"Weekly digest, week {week.week}: {len(rows)} seen, {open_ahead} winnable"
         + fv_title
+        + sbs_title
         + bf_title,
         body="\n".join(lines),
         url=None,
@@ -694,6 +698,59 @@ def _fv_digest_line(v: FvVerdict, removed: datetime | None, cfg: Config) -> str:
         tags.append(f"early move-in {d.move_in.isoformat()}")
     top = (d.top_points if d.top_points is not None else "none") if d else "?"
     return f"FV {x.area}, {kind}, {_kr(x.rent)} · top {top} · {', '.join(tags)}"
+
+
+# --- SBS (M6): digest only ---
+_SBS_ORDER = {"in": 0, "agreement": 1, "early": 2}
+
+
+def _sbs_digest(
+    hist: sqlite3.Connection, cfg: Config, week_start: datetime
+) -> tuple[list[str], list[str], str]:
+    """(summary lines, listing lines, title suffix); empty without SBS rows. Only watched
+    rooms within rent and not after the window get a line; the rest are counted."""
+    rows = [
+        (sbs_classify(x, cfg), first, removed)
+        for x, first, removed in sbs_seen_since(hist, week_start)
+    ]
+    if not rows:
+        return [], [], ""
+    other = sum(1 for v, _, _ in rows if not v.watched)
+    over = sum(1 for v, _, _ in rows if v.watched and v.over_budget)
+    fit = [r for r in rows if r[0].watched and not r[0].over_budget]
+    late = sum(1 for v, _, _ in fit if v.window == "late")
+    shown = sorted(
+        (r for r in fit if r[0].window != "late"),
+        key=lambda r: (_SBS_ORDER[r[0].window], r[0].listing.rent, r[0].listing.id),
+    )
+    counted = [
+        f"{late} after the window" if late else "",
+        f"{over} over budget" if over else "",
+        f"{other} other type" if other else "",
+    ]
+    counted = [c for c in counted if c]
+    head = [
+        f"SBS: {len(rows)} seen, {len(shown)} within rent"
+        + (", " + ", ".join(counted) + " (not listed)" if counted else "")
+    ]
+    lines = [_sbs_digest_line(v, first >= week_start, removed) for v, first, removed in shown]
+    return head, lines, f" · SBS {len(rows)} seen, {len(shown)} within rent"
+
+
+def _sbs_digest_line(v, new: bool, removed: datetime | None) -> str:
+    x = v.listing
+    when = x.move_in.isoformat() if x.move_in else "by agreement"
+    tags = ["new"] if new else []
+    if removed:
+        tags.append("closed")
+    if v.short_term:
+        tags.append("short-term")
+    if v.window == "early":
+        tags.append("early move-in")
+    tags += x.labels
+    return f"SBS {x.address}, {x.rooms}, {_kr(x.rent)} · move-in {when}" + (
+        " · " + ", ".join(tags) if tags else ""
+    )
 
 
 # --- heartbeat (failure streak in state.db meta) ---
