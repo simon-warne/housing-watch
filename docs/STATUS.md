@@ -11,7 +11,7 @@ Updated: 2026-11-26, M6 part A (reconnaissance) done, waiting for Simon. Reports
 2. Check Mina sidor's number against the computed one, and when the daily +1 lands.
 3. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
 4. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`).
-5. M6 part A done (`docs/reports/M6.md`). **Simon answers the 5 questions there** (order: Förvaltaren first? HomeQ POST? SBS/Heimstaden alert or digest? Förvaltaren points into secrets; drop Stena, re-check Wallenstam after 1 Dec). Then part B, one source per session, plan first.
+5. M6 part A done and answered (`docs/reports/M6.md`, PRD §6). Simon: add secrets `FV_POINTS` and `FV_POINTS_ON` (YYYY-MM-DD). **Next session: M6 Förvaltaren** (plan first, tests first), then SBS (digest only), Heimstaden (digest only), Wallenstam after 1 Dec, HomeQ (check terms, one POST search).
 
 ## Open for Simon
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.

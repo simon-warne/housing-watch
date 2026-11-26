@@ -68,13 +68,13 @@ Each ends with its acceptance tests green, a short report with evidence in `docs
 
 **M5: Bostadsförmedlingen** (student and youth listings). Can start as soon as M4 works.
 
-**M6: My other queues** (Simon, 2026-11-26; order by Claude, by fit with §3 and coverage). Starts like M0/M5: reconnaissance of each site (terms and robots.txt, what is visible logged out, how a listing is allocated, whether any competition figure is shown), then a stop for Simon. Then one source per session, in this order:
-1. **Studentbostäder i Norden (SBS), Stockholm queue.** The only other student-housing queue: closest to the criteria (rent, own bathroom).
-2. **HomeQ.** One source for several landlords (Heimstaden, Stena, Balder, Willhem, Ikano, John Mattson). Market rents and income requirements, so low odds, but the widest coverage per integration.
-3. **Förvaltaren (Sundbyberg).** Municipal landlord inside the BF area scope (Sundbyberg, tier 2).
-4. **Wallenstam.** Own queue; days reset on signing.
-5. **Heimstaden, Stena Fastigheter directly:** only listings HomeQ doesn't already show.
-Out: SKB (not joined; add if Simon joins), Rikshem (Stockholm goes through BF). Same rules as SSSB/BF: GET only, logged out, ≤ every 30 min, own guard and heartbeat per source, and a source's failure never stops the others. Any login-only figure → that source alerts "new matching listing" only, or digest only (Simon decides per source).
+**M6: My other queues** (Simon, 2026-11-26). Part A (reconnaissance, `docs/reports/M6.md`) is done. Then one source per session, in this order (Simon, 2026-11-26, after part A):
+1. **Förvaltaren (Sundbyberg).** Top queue points are shown logged out, so it gets the same alerts as SSSB. Points are in GitHub secrets.
+2. **Studentbostäder i Norden (SBS), Stockholm.** No competition figure: **digest only** for now (Simon, 2026-11-26).
+3. **Heimstaden directly.** No competition figure: **digest only** for now (Simon, 2026-11-26).
+4. **Wallenstam.** Re-check after its new website launches (1 Dec 2026), then decide.
+5. **HomeQ.** Its search is POST-only: **one read-only POST search per run is allowed for HomeQ only** (Simon, 2026-11-26), after checking HomeQ's user terms. Never login, apply or any other POST.
+Out: Stena Fastigheter (Stockholm goes through BF; Simon, 2026-11-26), SKB (not joined; add if Simon joins), Rikshem (Stockholm goes through BF). Same rules as SSSB/BF: GET only (except the HomeQ search above), logged out, ≤ every 30 min, own guard and heartbeat per source, and a source's failure never stops the others.
 
 **Later (backlog):** a small history dashboard.
 
