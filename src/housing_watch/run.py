@@ -74,9 +74,11 @@ from housing_watch.history import (
     fv_record,
     open_db,
     record,
+    sbs_record,
 )
 from housing_watch.ntfy import make_send
 from housing_watch.rules import bf_worth_details, fv_worth_details
+from housing_watch.sbs import fetch_sbs, sbs_get
 from housing_watch.sssb import (
     STOCKHOLM,
     Detail,
@@ -96,6 +98,7 @@ PAUSE_S = 5  # between SSSB requests
 DETAIL_CAP = 10  # detail requests per run
 LIVE_WINDOW = timedelta(hours=48)  # PRD §1: live top days this close to a deadline
 GUARD = timedelta(minutes=25)  # never two list fetches closer than this (plan M4)
+GUARD_SLACK = timedelta(minutes=5)  # runs drift: a longer source guard is its interval minus this
 
 
 class EmptyRun(Exception):
@@ -130,7 +133,7 @@ def _observations(hist: sqlite3.Connection) -> tuple[int, ...]:
     a loss in the other (M5 review)."""
     return tuple(
         hist.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-        for t in ("observations", "bf_observations", "fv_observations")
+        for t in ("observations", "bf_observations", "fv_observations", "sbs_observations")
     )
 
 
@@ -289,6 +292,15 @@ def _watch_fv(hist, cfg, points, state, now, get, sleep) -> tuple[int, list]:
     return len(listings), alerts
 
 
+def _watch_sbs(hist, cfg, now, get, sleep) -> tuple[int, list]:
+    """SBS is digest only: record the list pages, no alerts (Simon, 2026-11-26)."""
+    listings = fetch_sbs(get, sleep, now, max_pages=cfg.sbs.max_pages, pause=PAUSE_S)
+    if not listings:
+        raise EmptyRun("0 SBS listings parsed")
+    sbs_record(hist, listings, now)
+    return len(listings), []
+
+
 def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
@@ -335,6 +347,7 @@ def run(
     get: Callable[[str], str],
     bf_get: Callable[[str], str] | None = None,
     fv_get: Callable[[str], str] | None = None,
+    sbs_get: Callable[[str], str] | None = None,
     send: Callable[[Alert], object],
     sleep: Callable[[float], object],
     now: datetime,
@@ -344,8 +357,8 @@ def run(
 ) -> int:
     """One scheduled run. Returns 0 (ok or skipped) or 1 (SSSB or BF failed, saved and ready).
 
-    `bf_get` fetches Bostadsförmedlingen and `fv_get` Förvaltaren; None leaves that source
-    out (tests of one source).
+    `bf_get` fetches Bostadsförmedlingen, `fv_get` Förvaltaren and `sbs_get` SBS (its own
+    guard, `sbs.every_hours`); None leaves that source out (tests of one source).
 
     Setup problems (config, QUEUE_DAYS, key, missing or unexpected files, a shrinking
     history) raise instead, before `ready` exists, so nothing is pushed. A bad per-source
@@ -391,9 +404,9 @@ def run(
             parts: list[str] = []
             ok: list[str] = []
 
-            def part(name, meta_key, label, work):
+            def part(name, meta_key, label, work, guard=GUARD):
                 last = _meta(state, meta_key)
-                if last and now - datetime.fromisoformat(last) < GUARD:
+                if last and now - datetime.fromisoformat(last) < guard:
                     parts.append(f"{label}skipped: recent fetch")
                     return
                 _set_meta(state, meta_key, now.astimezone(UTC).isoformat())
@@ -435,6 +448,14 @@ def run(
                     "fv_last_fetch",
                     "fv ",
                     lambda: _watch_fv(hist, cfg, _ok(fv_points, fv_err), state, now, fv_get, sleep),
+                )
+            if sbs_get is not None:
+                part(
+                    "sbs",
+                    "sbs_last_fetch",
+                    "sbs ",
+                    lambda: _watch_sbs(hist, cfg, now, sbs_get, sleep),
+                    guard=cfg.sbs.every - GUARD_SLACK,
                 )
             if ok:  # after every part, so it has this run's data and survives either failing
                 try:
@@ -478,6 +499,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             get=http_get,
             bf_get=bf_get,
             fv_get=fv_get,
+            sbs_get=sbs_get,
             send=make_send(env.get("NTFY_TOPIC", "")),
             sleep=time.sleep,
             now=datetime.now(UTC),

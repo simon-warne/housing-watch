@@ -754,7 +754,7 @@ def _sbs_digest_line(v, new: bool, removed: datetime | None) -> str:
 
 
 # --- heartbeat (failure streak in state.db meta) ---
-SOURCE_NAMES = {"bf": "BF", "fv": "FV"}
+SOURCE_NAMES = {"bf": "BF", "fv": "FV", "sbs": "SBS"}
 
 
 def _meta(state: sqlite3.Connection, key: str) -> str | None:
