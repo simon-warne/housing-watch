@@ -14,3 +14,4 @@ One line each, newest last: `YYYY-MM-DD · decision · why · (Simon | Claude, r
 - 2026-11-26 · PRD §2/§5 facts updated from M0 (widgets JSON endpoint, one request for all listings) · facts, no scope change · (Simon)
 - 2026-11-26 · ntfy test from GitHub Actions in M0 via a manual-only workflow · proves the secret → Actions → phone path before M4 · (Simon)
 - 2026-11-26 · Schedule at odd minutes and add an explicit keep-alive in M4 · GitHub delays/drops top-of-hour runs; 60-day pause, and the docs don't say bot commits count as activity · (Claude, reversible)
+- 2026-11-26 · M1 plan approved (docs/plans/M1.md), incl. assumption: null/""/"0 (0st)" antalIntresse → top_days=None, applicants=0 · parser strict, no silent zeros · (Simon)
