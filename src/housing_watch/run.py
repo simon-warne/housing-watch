@@ -58,6 +58,7 @@ from housing_watch.rules import bf_worth_details
 from housing_watch.sssb import (
     Detail,
     Listing,
+    ParseError,
     detail_url,
     http_get,
     list_url,
@@ -78,6 +79,15 @@ class EmptyRun(Exception):
     """SSSB answered, but with 0 listings (counts as a failed run, PRD §4)."""
 
 
+class PartialRun(Exception):
+    """Some BF detail pages didn't parse: the rest were recorded and their alerts stand, but
+    the run still counts as failed for the heartbeat (M5 review)."""
+
+    def __init__(self, cause: Exception, n: int, alerts: list):
+        super().__init__(str(cause))
+        self.cause, self.n, self.alerts = cause, n, alerts
+
+
 def _meta(state: sqlite3.Connection, key: str) -> str | None:
     row = state.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
     return row[0] if row else None
@@ -92,8 +102,13 @@ def _set_meta(state: sqlite3.Connection, key: str, value: str) -> None:
         )
 
 
-def _observations(hist: sqlite3.Connection) -> int:
-    return hist.execute("SELECT COUNT(*) FROM observations").fetchone()[0]
+def _observations(hist: sqlite3.Connection) -> tuple[int, int]:
+    """Rows per observation table, compared one by one: growth in one source must not hide
+    a loss in the other (M5 review)."""
+    return tuple(
+        hist.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        for t in ("observations", "bf_observations")
+    )
 
 
 def _higher(a: int | None, b: int | None) -> int | None:
@@ -190,14 +205,21 @@ def _watch_bf(hist, cfg, since, now, get, sleep) -> tuple[int, list]:
     if not listings:
         raise EmptyRun("0 BF listings parsed")
     details: dict[str, BfDetail] = {}
+    errors: list[ParseError] = []
     for x in pick_bf_details(hist, listings, cfg, now):
         sleep(PAUSE_S)
-        details[x.id] = parse_bf_detail(get(bf.detail_url(x)), x)
+        try:
+            details[x.id] = parse_bf_detail(get(bf.detail_url(x)), x)
+        except ParseError as e:  # one odd page must not block the others (M5 review)
+            errors.append(e)
     bf_record(hist, listings, details, now)
-    return len(listings), bf_listing_alerts(hist, cfg, since, frozenset(details), now)
+    alerts = bf_listing_alerts(hist, cfg, since, frozenset(details), now)
+    if errors:
+        raise PartialRun(errors[0], len(listings), alerts)
+    return len(listings), alerts
 
 
-def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep, bf_since) -> tuple[int, list]:
+def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
         raise EmptyRun("0 listings parsed")
@@ -207,9 +229,7 @@ def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep, bf_since) -> tu
         details[x.id] = parse_detail(load_jsonp(get(detail_url(x))), x.id)
     listings = [merge(x, details.get(x.id)) for x in listings]
     record(hist, listings, details, now)
-    alerts = listing_alerts(hist, cfg, queue, booked, now)
-    alerts.append(digest_alert(hist, cfg, queue, booked, now, bf_since=bf_since))
-    return len(listings), alerts
+    return len(listings), listing_alerts(hist, cfg, queue, booked, now)
 
 
 def _test_alert(now: datetime) -> Alert:
@@ -278,6 +298,7 @@ def run(
             alerts: list = []
             failures: list[Exception] = []
             parts: list[str] = []
+            ok: list[str] = []
 
             def part(name, meta_key, label, work):
                 last = _meta(state, meta_key)
@@ -290,7 +311,12 @@ def run(
                     run_ok(state, source=name)
                     alerts.extend(found)
                     parts.append(f"{label}ok: {n}" + ("" if name else " listings"))
+                    ok.append(name)
                 except Exception as e:  # noqa: BLE001 - every failure feeds the heartbeat
+                    if isinstance(e, PartialRun):
+                        alerts.extend(e.alerts)
+                        ok.append(name)  # recorded: the digest may use it
+                        e = e.cause
                     failures.append(e)
                     alerts.append(run_failed(state, now, f"{type(e).__name__}: {e}", source=name))
                     parts.append(f"{label}failed: {type(e).__name__}")
@@ -299,7 +325,7 @@ def run(
                 "",
                 "last_fetch",
                 "",
-                lambda: _watch(hist, cfg, queue, booked, now, get, sleep, bf_since),
+                lambda: _watch(hist, cfg, queue, booked, now, get, sleep),
             )
             if bf_get is not None:
                 part(
@@ -308,10 +334,20 @@ def run(
                     "bf ",
                     lambda: _watch_bf(hist, cfg, bf_since, now, bf_get, sleep),
                 )
+            if ok:  # after both parts, so it has this run's data and survives either failing
+                try:
+                    alerts.append(digest_alert(hist, cfg, queue, booked, now, bf_since=bf_since))
+                    run_ok(state, source="digest")
+                except Exception as e:  # noqa: BLE001
+                    failures.append(e)
+                    alerts.append(
+                        run_failed(state, now, f"{type(e).__name__}: {e}", source="digest")
+                    )
+                    parts.append(f"digest failed: {type(e).__name__}")
             dispatch(state, alerts, send, now)
             line = " · ".join(parts)
             failed = failures[0] if failures else None
-            if _observations(hist) < before:
+            if any(n < b for n, b in zip(_observations(hist), before, strict=True)):
                 raise RuntimeError("history shrank; not saving")
         finally:
             hist.close()

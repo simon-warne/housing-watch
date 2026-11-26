@@ -353,9 +353,10 @@ def _bf_latest_row(conn: sqlite3.Connection, id_: str) -> sqlite3.Row | None:
 
 
 def bf_detail(conn: sqlite3.Connection, id_: str) -> BfDetail | None:
-    """The latest known detail (move-in, top dates), or None if never fetched."""
-    row = _bf_latest_row(conn, id_)
-    return _bf_det(row) if row else None
+    """The current listing's latest detail, or None if never fetched or the listing is not
+    active (a re-listing must not reuse the old listing's move-in or dates; M5 review)."""
+    rows = _bf_rows(conn, "l.id = ? AND l.removed_at IS NULL", (id_,))
+    return _bf_det(rows[0]) if rows else None
 
 
 def _bf_rows(conn: sqlite3.Connection, where: str, args: tuple) -> list[sqlite3.Row]:

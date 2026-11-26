@@ -1,0 +1,6 @@
+=========================== short test summary info ============================
+FAILED tests/test_run_bf.py::test_one_bad_detail_page_does_not_block_the_others
+FAILED tests/test_run_bf.py::test_digest_survives_an_sssb_failure_and_has_this_runs_bf
+FAILED tests/test_run_bf.py::test_shrinking_bf_history_aborts - Failed: DID N...
+FAILED tests/test_history_bf.py::test_removed_listing_has_no_current_detail
+4 failed, 28 passed in 1.00s

@@ -362,7 +362,7 @@ def test_shrinking_history_aborts_without_ready(tmp_path, sssb, monkeypatch):
     import housing_watch.run as r
 
     real = r._observations
-    calls = iter([10**6])
+    calls = iter([(10**6, 0)])
     monkeypatch.setattr(r, "_observations", lambda c: next(calls, None) or real(c))
     with pytest.raises(RuntimeError, match="shrank"):
         go(tmp_path, sssb, T0 + timedelta(hours=1))

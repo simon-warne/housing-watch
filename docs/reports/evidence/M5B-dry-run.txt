@@ -1,0 +1,124 @@
+ok: 24 listings · bf ok: 527
+== first run: rc=0, BF requests=11
+[last_call/urgent] BF · LAST CALL, closes 23:59: Vasastaden, Ungdomslägenhet, 4,631 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Crafoords Väg 14, floor 3 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59 (over budget): Vasastaden, Ungdomslägenhet, 6,618 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Döbelnsgatan 48, floor 2 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Bagarmossen, Korttidskontrakt, 5,173 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Emågatan 44, floor 1 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Blackeberg, Ungdomslägenhet, 5,725 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Wergelandsgatan 5, floor 2 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Gubbängen, UngdomKorttid, 5,808 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Dörrvägen 21, floor 1 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Tensta, Studentlägenhet, 5,932 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Tenstagången 55, floor 7 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Tensta, Studentlägenhet, 5,932 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Tenstagången 55, floor 3 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Tensta, Studentlägenhet, 5,932 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Tenstagången 55, floor 11 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Huvudsta, Ungdomslägenhet, 5,042 kr
+  Closes 23:59 today (in 3 h 22 min) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Johan Enbergs väg 1, ground floor · move-in 2027-07-01
+[winnable/high] BF · Winnable: Södermalm, Korttidskontrakt, 4,612 kr
+  Södermalm · Götgatan 103B, floor 2
+  4,612 kr/month · move-in 2027-07-01
+  Top queue since 2021-11-27 vs yours 2021-01-01
+  Apply by Sun 29 Nov
+ok: 24 listings · bf ok: 527
+== 4 h before BF close: rc=0, BF requests=11
+[digest/low] Weekly digest, week 48: 24 seen, 7 winnable · BF 108 seen, 10 winnable
+  Winning days by area: none closed this week
+  BF: 108 seen, 10 winnable
+  BF winning dates: none closed this week
+  Idun, 1 rum & pentry, 6,057 kr · top 1190 · behind, over budget
+  Nyponet, 3 rum & kök, 10,314 kr · top 1553 · behind
+  Nyponet, 2 rum & kök, 10,448 kr · top 1553 · behind
+  Forum, Rum i korridor, 4,690 kr · top 504 · behind
+  Roslagstull, Rum i korridor, 4,514 kr · top 179 · winnable
+  Roslagstull, Rum i korridor, 4,523 kr · top 175 · winnable
+  Jerum, Rum i korridor, 4,743 kr · top 314 · behind
+  Strix, Rum i korridor, 3,841 kr · top 132 · winnable
+  Pax, Rum i korridor, 4,181 kr · top 182 · winnable
+  Pax, 1 rum & pentry, 5,266 kr · top 329 · behind
+  Pax, 1 rum & pentry, 5,266 kr · top 329 · behind
+  Strix, 1 rum & kök, 6,864 kr · top 94 · winnable, over budget
+  Strix, 1 rum & kök, 7,172 kr · top 94 · winnable, over budget
+  Kungshamra, 1 rum & kök, 7,179 kr · top 60 · winnable, over budget
+  Kungshamra, 3 rum & kök, 13,649 kr · top 139 · winnable
+  Kungshamra, Rum i korridor, 4,171 kr · top 175 · winnable
+  Lappkärrsberget, Rum i korridor, 4,767 kr · top 178 · winnable
+  Lappkärrsberget, 1 rum & kök, 8,215 kr · top 93 · winnable, over budget
+  Lappkärrsberget, 1 rum & kök, 8,215 kr · top 93 · winnable, over budget
+  Lappkärrsberget, 1 rum & kök, 8,426 kr · top 93 · winnable, over budget
+  Lappkärrsberget, 1 rum & kök, 8,524 kr · top 23 · winnable, over budget
+  Lappkärrsberget, 3 rum & pentry, 9,694 kr · top 766 · behind
+  Lappkärrsberget, Rum i korridor, 4,745 kr · top 167 · winnable
+  Lappkärrsberget, 1 rum & pentry, 6,227 kr · top 182 · winnable, over budget
+  BF Södermalm, Korttidskontrakt, 4,612 kr · top 2021-11-27 · winnable
+  BF Vasastaden, Ungdomslägenhet, 4,631 kr · top 2021-11-27 · winnable
+  BF Vasastaden, Ungdomslägenhet, 6,618 kr · top 2021-11-27 · winnable, over budget
+  BF Bagarmossen, Korttidskontrakt, 5,173 kr · top 2021-11-27 · winnable
+  BF Blackeberg, Ungdomslägenhet, 5,725 kr · top 2021-11-27 · winnable
+  BF Gubbängen, UngdomKorttid, 5,808 kr · top 2021-11-27 · winnable
+  BF Tensta, Studentlägenhet, 5,932 kr · top 2021-11-27 · winnable
+  BF Tensta, Studentlägenhet, 5,932 kr · top 2021-11-27 · winnable
+  BF Tensta, Studentlägenhet, 5,932 kr · top 2021-11-27 · winnable
+  BF Huvudsta, Ungdomslägenhet, 5,042 kr · top 2021-11-27 · winnable
+  BF Ladugårdsgärdet, Studentlägenhet, 5,720 kr · top ? · no detail yet
+  BF Stadshagen, Studentlägenhet, 6,035 kr · top ? · no detail yet, over budget
+  BF Stadshagen, Studentlägenhet, 6,035 kr · top ? · no detail yet, over budget
+  BF Norra Djurgården, Studentkorridor, 6,213 kr · top ? · no detail yet, over budget
+  BF Norra Djurgården, Studentkorridor, 6,213 kr · top ? · no detail yet, over budget
+  BF Norra Djurgården, Studentkorridor, 6,213 kr · top ? · no detail yet, over budget
+  BF Kungsholmen, Korttidskontrakt, 7,155 kr · top ? · no detail yet, over budget
+  BF Södermalm, Korttidskontrakt, 7,362 kr · top ? · no detail yet
+  BF Norra Djurgården, Studentlägenhet, 7,632 kr · top ? · no detail yet, over budget
+  BF Norra Djurgården, Studentlägenhet, 7,774 kr · top ? · no detail yet, over budget
+  BF Norra Djurgården, Studentlägenhet, 7,775 kr · top ? · no detail yet, over budget
+  BF Ladugårdsgärdet, Ungdomslägenhet, 8,243 kr · top ? · no detail yet, over budget
+  BF Kungsholmen, UngdomKorttid, 8,259 kr · top ? · no detail yet, over budget
+  BF Södermalm, Studentlägenhet, 8,647 kr · top ? · no detail yet
+  BF Kungsholmen, Korttidskontrakt, 9,201 kr · top ? · no detail yet
+  BF Södermalm, Studentlägenhet, 9,819 kr · top ? · no detail yet
+  BF Södermalm, Studentlägenhet, 9,869 kr · top ? · no detail yet
+  BF Södermalm, Korttidskontrakt, 10,711 kr · top ? · no detail yet
+  BF Södermalm, Korttidskontrakt, 18,122 kr · top ? · no detail yet
+  +79 more
+[last_call/urgent] BF · LAST CALL, closes 23:59: Södermalm, Korttidskontrakt, 4,612 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Götgatan 103B, floor 2 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Ladugårdsgärdet, Studentlägenhet, 5,720 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Värtavägen 60, floor 5 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59 (over budget): Stadshagen, Studentlägenhet, 6,035 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Sankt Göransgatan 151, floor 3 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59 (over budget): Stadshagen, Studentlägenhet, 6,035 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Sankt Göransgatan 151, floor 3 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59 (over budget): Norra Djurgården, Studentkorridor, 6,213 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Ruddammsvägen 65, floor 2 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Skytteholm, Ungdomslägenhet, 3,044 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Västra vägen 7B, floor 8 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Farsta, Ungdomslägenhet, 4,911 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Kristinehamnsgatan 72, floor 2 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Husby, Ungdomslägenhet, 5,499 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Trondheimsgatan 3, floor 5 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Kista, Studentlägenhet, 5,872 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Hanstavägen 49, floor 10 · move-in 2027-07-01
+[last_call/urgent] BF · LAST CALL, closes 23:59: Kista, Studentlägenhet, 5,872 kr
+  Closes 23:59 today (in 4 h) · you lead: yours 2021-01-01 vs top 2021-11-27
+  Hanstavägen 49, floor 10 · move-in 2027-07-01

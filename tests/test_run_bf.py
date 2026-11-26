@@ -193,7 +193,12 @@ def test_bf_detail_parse_error_fails_bf_only(tmp_path, sssb, bf):
     rc, phone, _ = go(tmp_path, sssb, bf, T0)
     assert rc == 1 and bf_ids(phone) == [] and len(phone.got) == 6
     conn = sqlite3.connect(tmp_path / "history.sqlite")
-    assert conn.execute("SELECT COUNT(*) FROM bf_observations").fetchone()[0] == 0
+    # The list is recorded (review fix); the bad page leaves no detail behind.
+    assert conn.execute("SELECT COUNT(*) FROM bf_observations").fetchone()[0] == 4
+    assert (
+        conn.execute("SELECT COUNT(*) FROM bf_observations WHERE move_in IS NOT NULL").fetchone()[0]
+        == 0
+    )
     conn.close()
 
 
@@ -263,3 +268,58 @@ def test_main_wires_the_bf_fetcher(tmp_path, monkeypatch):
     monkeypatch.setattr(runmod, "run", lambda *a, **k: seen.update(k) or 0)
     assert runmod.main(["--data", str(tmp_path)]) == 0
     assert seen["bf_get"] is runmod.bf_get
+
+
+# --- review fixes ---
+def test_one_bad_detail_page_does_not_block_the_others(tmp_path, sssb):
+    """Review: a ParseError on one page used to drop every BF alert, every run."""
+    bad = "202620141"
+
+    class OddPage(FakeBF):
+        def __call__(self, url):
+            page = super().__call__(url)
+            if url.endswith(f"/{bad}/"):
+                page = re.sub(
+                    r'(Inflytt</span>\s*<span class="apartment-facts__heading">)[^<]*',
+                    lambda m: m.group(1) + "enligt överenskommelse",
+                    page,
+                )
+            return page
+
+    bf = OddPage(ids=[CORRIDOR, bad, KISTA])
+    rc, phone, _ = go(tmp_path, sssb, bf, T0)
+    assert f"https://bostad.stockholm.se/bostad/{bad}/" in bf.detail_calls()
+    assert rc == 1  # still a failed BF run, so the heartbeat counts it
+    assert bf_ids(phone) == [("winnable", "bf:" + CORRIDOR)]
+    conn = sqlite3.connect(tmp_path / "history.sqlite")
+    stored = conn.execute(
+        "SELECT listing_id FROM bf_observations WHERE move_in IS NOT NULL"
+    ).fetchall()
+    conn.close()
+    assert stored == [(CORRIDOR,)]
+
+
+def test_digest_survives_an_sssb_failure_and_has_this_runs_bf(tmp_path, sssb, bf):
+    sunday = datetime(2026, 11, 29, 18, 7, tzinfo=STHLM)
+    sssb.fail = OSError("down")
+    _, phone, _ = go(tmp_path, sssb, bf, sunday)
+    [d] = [a for a in phone.got if a.kind == "digest"]
+    assert "BF 3 seen" in d.title  # Huddinge is out of scope
+    assert "BF:" in d.body  # BF recorded in this very run
+
+
+def test_shrinking_bf_history_aborts(tmp_path, sssb, bf, monkeypatch):
+    go(tmp_path, sssb, bf, T0)
+    real = runmod.bf_record
+
+    def shrink(hist, *a, **k):
+        out = real(hist, *a, **k)
+        hist.execute("DELETE FROM bf_observations WHERE id = 1")
+        hist.commit()
+        return out
+
+    monkeypatch.setattr(runmod, "bf_record", shrink)
+    (tmp_path / "ready").unlink()
+    with pytest.raises(RuntimeError, match="shrank"):
+        go(tmp_path, sssb, bf, T0 + timedelta(minutes=30))
+    assert not (tmp_path / "ready").exists()

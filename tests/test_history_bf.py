@@ -161,3 +161,10 @@ def test_v1_db_migrates_in_place_and_keeps_sssb_rows(tmp_path):
     ]
     assert n(c, "bf_listings") == 0
     c.close()
+
+
+def test_removed_listing_has_no_current_detail(conn, bf0):
+    """Review: a re-listed listing must not be picked by its old listing's detail."""
+    bf_record(conn, bf0, {CORRIDOR: DET}, T0)
+    bf_record(conn, at([x for x in bf0 if x.id != CORRIDOR], T1), {}, T1)
+    assert bf_detail(conn, CORRIDOR) is None
