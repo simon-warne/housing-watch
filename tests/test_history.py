@@ -214,6 +214,8 @@ def test_history_db_has_no_alerts_table(db):
         "bf_observations",
         "fv_listings",
         "fv_observations",
+        "sbs_listings",
+        "sbs_observations",
     }
 
 

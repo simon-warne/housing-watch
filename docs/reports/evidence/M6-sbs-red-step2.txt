@@ -1,0 +1,6 @@
+    from housing_watch.history import (
+E   ImportError: cannot import name 'sbs_active' from 'housing_watch.history' (/Users/simonwarne/Developer/housing-watch/src/housing_watch/history.py)
+=========================== short test summary info ============================
+ERROR tests/test_history_sbs.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.10s

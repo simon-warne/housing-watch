@@ -144,6 +144,8 @@ def test_v2_db_migrates_in_place_and_keeps_sssb_and_bf_rows(tmp_path):
     c = open_db(path)
     record(c, sssb, {}, T0)
     bf_record(c, bf, {}, T0)
+    c.execute("DROP TABLE sbs_observations")
+    c.execute("DROP TABLE sbs_listings")
     c.execute("DROP TABLE fv_observations")
     c.execute("DROP TABLE fv_listings")
     c.execute("PRAGMA user_version = 2")
@@ -156,7 +158,7 @@ def test_v2_db_migrates_in_place_and_keeps_sssb_and_bf_rows(tmp_path):
     c.close()
 
     c = open_db(path)
-    assert c.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 3
+    assert c.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     for t, rows in dump.items():
         assert [tuple(r) for r in c.execute(f"SELECT * FROM {t} ORDER BY id")] == rows
     assert n(c, "fv_listings") == 0

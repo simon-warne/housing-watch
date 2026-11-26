@@ -1,10 +1,10 @@
-"""SQLite history of SSSB, BF and Förvaltaren listings: a row per distinct state (M2, M5, M6).
+"""SQLite history of SSSB, BF, Förvaltaren and SBS listings: a row per distinct state (M2, M5, M6).
 
 A listing's state is every `Listing` field except `seen_at`, plus the deadline from its detail
 page. A run that sees no change writes nothing, so the DB file stays byte-identical.
 This DB is committed to the public `data` branch: it holds only public listing data.
-Schema v2 (M5) adds the `bf_*` tables, v3 (M6) the `fv_*` tables (Förvaltaren); an older DB
-gains them in place, existing rows untouched.
+Schema v2 (M5) adds the `bf_*` tables, v3 (M6) the `fv_*` tables (Förvaltaren), v4 the
+`sbs_*` tables (SBS); an older DB gains them in place, existing rows untouched.
 """
 
 import json
@@ -16,9 +16,10 @@ from pathlib import Path
 
 from housing_watch.bf import BfDetail, BfListing
 from housing_watch.fv import FvDetail, FvListing
+from housing_watch.sbs import SbsListing
 from housing_watch.sssb import Detail, Listing
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -108,8 +109,29 @@ CREATE TABLE IF NOT EXISTS fv_observations (
 );
 CREATE INDEX IF NOT EXISTS fv_observations_by_listing ON fv_observations (listing_id, id);
 """
-# Applied in order from the DB's version: v0 → all, v1 → BF + FV, v2 → FV.
-MIGRATIONS = (SCHEMA, BF_SCHEMA, FV_SCHEMA)
+SBS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS sbs_listings (
+    id         TEXT PRIMARY KEY,
+    first_seen TEXT NOT NULL,
+    removed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS sbs_observations (
+    id          INTEGER PRIMARY KEY,
+    listing_id  TEXT NOT NULL REFERENCES sbs_listings(id),
+    seen_at     TEXT NOT NULL,
+    tag         TEXT NOT NULL,
+    city        TEXT NOT NULL,
+    address     TEXT NOT NULL,
+    move_in     TEXT,
+    rent        INTEGER NOT NULL,
+    size_m2     INTEGER,
+    rooms       TEXT NOT NULL,
+    labels_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sbs_observations_by_listing ON sbs_observations (listing_id, id);
+"""
+# Applied in order from the DB's version: v0 → all, v1 → BF + FV + SBS, v2 → FV + SBS, v3 → SBS.
+MIGRATIONS = (SCHEMA, BF_SCHEMA, FV_SCHEMA, SBS_SCHEMA)
 
 # Columns compared to decide "changed" (everything but id, listing_id, seen_at).
 STATE_COLS = (
@@ -645,3 +667,119 @@ def fv_record(
             "UPDATE fv_listings SET removed_at = ? WHERE id = ?", [(seen, i) for i in removed]
         )
     return FvChanges(new=new, changed=changed, removed=removed, unchanged=unchanged)
+
+
+# --- SBS (M6): list facts only, no detail pages ---
+SBS_STATE_COLS = "tag city address move_in rent size_m2 rooms labels_json".split()
+
+
+@dataclass(frozen=True)
+class SbsChanges:
+    new: list[SbsListing]
+    changed: list[tuple[SbsListing, SbsListing]]
+    removed: list[str]
+    unchanged: int
+
+
+def _sbs_state(x: SbsListing) -> dict:
+    return {
+        "tag": x.tag,
+        "city": x.city,
+        "address": x.address,
+        "move_in": x.move_in.isoformat() if x.move_in else None,
+        "rent": x.rent,
+        "size_m2": x.size_m2,
+        "rooms": x.rooms,
+        "labels_json": json.dumps(list(x.labels), ensure_ascii=False),
+    }
+
+
+def _sbs_listing(row: sqlite3.Row) -> SbsListing:
+    return SbsListing(
+        id=row["listing_id"],
+        tag=row["tag"],
+        city=row["city"],
+        address=row["address"],
+        move_in=date.fromisoformat(row["move_in"]) if row["move_in"] else None,
+        rent=row["rent"],
+        size_m2=row["size_m2"],
+        rooms=row["rooms"],
+        labels=tuple(json.loads(row["labels_json"])),
+        seen_at=datetime.fromisoformat(row["seen_at"]),
+    )
+
+
+def _sbs_rows(conn: sqlite3.Connection, where: str, args: tuple) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT o.*, l.removed_at FROM sbs_listings l JOIN sbs_observations o ON o.id = "
+        "(SELECT MAX(id) FROM sbs_observations WHERE listing_id = l.id) "
+        f"WHERE {where} ORDER BY l.id",
+        args,
+    ).fetchall()
+
+
+def sbs_active(conn: sqlite3.Connection) -> list[SbsListing]:
+    return [_sbs_listing(r) for r in _sbs_rows(conn, "l.removed_at IS NULL", ())]
+
+
+def sbs_seen_since(
+    conn: sqlite3.Connection, since: datetime
+) -> list[tuple[SbsListing, datetime | None]]:
+    rows = _sbs_rows(conn, "l.removed_at IS NULL OR l.removed_at >= ?", (_ts(since),))
+    return [
+        (_sbs_listing(r), datetime.fromisoformat(r["removed_at"]) if r["removed_at"] else None)
+        for r in rows
+    ]
+
+
+def sbs_record(
+    conn: sqlite3.Connection, listings: Sequence[SbsListing], seen_at: datetime
+) -> SbsChanges:
+    """A row only on change; an empty run writes nothing (and removes nothing)."""
+    seen = _ts(seen_at)
+    ids = [x.id for x in listings]
+    if len(set(ids)) != len(ids):
+        raise ValueError("duplicate listing ids")
+    if any(x.seen_at != seen_at for x in listings):
+        raise ValueError("listing seen_at differs from the run's seen_at")
+    if not listings:
+        return SbsChanges(new=[], changed=[], removed=[], unchanged=0)
+
+    new: list[SbsListing] = []
+    changed: list[tuple[SbsListing, SbsListing]] = []
+    unchanged = 0
+    cols = ["listing_id", "seen_at", *SBS_STATE_COLS]
+    insert = (
+        f"INSERT INTO sbs_observations ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
+    )
+    with conn:
+        act = {
+            r["id"] for r in conn.execute("SELECT id FROM sbs_listings WHERE removed_at IS NULL")
+        }
+        for x in listings:
+            prev = conn.execute(
+                "SELECT * FROM sbs_observations WHERE listing_id = ? ORDER BY id DESC LIMIT 1",
+                (x.id,),
+            ).fetchone()
+            state = _sbs_state(x)
+            values = [x.id, seen, *(state[c] for c in SBS_STATE_COLS)]
+            if x.id not in act:
+                conn.execute(
+                    "INSERT INTO sbs_listings (id, first_seen) VALUES (?, ?) "
+                    "ON CONFLICT(id) DO UPDATE SET removed_at = NULL",
+                    (x.id, seen),
+                )
+                conn.execute(insert, values)
+                new.append(x)
+            elif prev is None:
+                raise RuntimeError(f"active SBS listing {x.id} has no observation")
+            elif any(prev[c] != state[c] for c in SBS_STATE_COLS):
+                conn.execute(insert, values)
+                changed.append((_sbs_listing(prev), x))
+            else:
+                unchanged += 1
+        removed = sorted(act - set(ids))
+        conn.executemany(
+            "UPDATE sbs_listings SET removed_at = ? WHERE id = ?", [(seen, i) for i in removed]
+        )
+    return SbsChanges(new=new, changed=changed, removed=removed, unchanged=unchanged)

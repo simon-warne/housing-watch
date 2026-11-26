@@ -1,6 +1,6 @@
 """M3 config tests: the committed config.yaml, strict loading, queue days from env."""
 
-from datetime import date, time
+from datetime import date, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -236,3 +236,33 @@ def test_bad_fv_points_raise_without_echo(env):
         load_fv_points(env, TODAY)
     for v in env.values():
         assert v not in str(e.value)
+
+
+# --- M6: SBS ---
+def test_real_config_sbs_section():
+    sbs = load_config(REAL).sbs
+    assert sbs.rooms == ("1 rum", "Korridor")
+    assert sbs.every == timedelta(hours=6)
+    assert sbs.max_pages == 5
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda d: d.pop("sbs"),
+        lambda d: d["sbs"].pop("rooms"),
+        lambda d: d["sbs"].update(rooms=[]),
+        lambda d: d["sbs"].update(every_hours=0),
+        lambda d: d["sbs"].update(every_hours=0.25),  # never more often than every 30 min
+        lambda d: d["sbs"].update(every_hours=25),
+        lambda d: d["sbs"].update(every_hours=True),
+        lambda d: d["sbs"].update(max_pages=0),
+        lambda d: d["sbs"].update(max_pages=21),
+        lambda d: d["sbs"].update(extra=1),
+    ],
+)
+def test_bad_sbs_section_raises(tmp_path, edit):
+    data = real_data()
+    edit(data)
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path, data))

@@ -69,3 +69,13 @@ fv:
   types:
     alert: [1 rum o kokvrå, 1 rum o kök]
     digest: [2 rum o kök, 3 rum o kök, 4 rum o kök]
+
+# Studentbostäder i Norden, Stockholm (M6, Simon 2026-11-26). Digest only: SBS shows no
+# competition figure. Rent and move-in window as above, no stretch (Spånga/Bromsten).
+sbs:
+  # Watched "rooms" values on the cards; anything else is shown as "other type".
+  rooms: [1 rum, Korridor]
+  # Own guard: list pages at most this often.
+  every_hours: 6
+  # Never more list pages than this in one run (16 listings = 2 pages today).
+  max_pages: 5

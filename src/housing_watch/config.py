@@ -8,7 +8,7 @@ Errors about secrets never echo the secret's value.
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,13 @@ class FvConfig:
 
 
 @dataclass(frozen=True)
+class SbsConfig:
+    rooms: tuple[str, ...]  # watched "rooms" values ("1 rum", "Korridor"); others = other type
+    every: timedelta  # own guard: SBS is digest only (Simon, 2026-11-26)
+    max_pages: int
+
+
+@dataclass(frozen=True)
 class Config:
     alert_types: tuple[str, ...]
     digest_types: tuple[str, ...]
@@ -60,6 +67,7 @@ class Config:
     digest_time: time
     bf: BfConfig
     fv: FvConfig
+    sbs: SbsConfig
 
     def tier(self, area: str) -> int:
         """0 = best; unlisted areas rank last (len(area_tiers))."""
@@ -149,6 +157,7 @@ def load_config(path: str | Path) -> Config:
         "digest",
         "bf",
         "fv",
+        "sbs",
     }
     d = _keys(raw, top, "config")
     alert_types, digest_types = _types(d["types"], "types")
@@ -195,6 +204,14 @@ def load_config(path: str | Path) -> Config:
 
     fv_alert, fv_digest = _types(_keys(d["fv"], {"types"}, "fv")["types"], "fv.types")
 
+    sbs = _keys(d["sbs"], {"rooms", "every_hours", "max_pages"}, "sbs")
+    every = sbs["every_hours"]
+    if isinstance(every, bool) or not isinstance(every, int | float) or not 0.5 <= every <= 24:
+        raise ConfigError("sbs.every_hours: expected a number in [0.5, 24]")
+    pages = _int(sbs["max_pages"], "sbs.max_pages")
+    if pages > 20:
+        raise ConfigError("sbs.max_pages: at most 20")
+
     return Config(
         alert_types=alert_types,
         digest_types=digest_types,
@@ -215,6 +232,11 @@ def load_config(path: str | Path) -> Config:
             alert_max_rooms=float(rooms),
         ),
         fv=FvConfig(alert_types=fv_alert, digest_types=fv_digest),
+        sbs=SbsConfig(
+            rooms=_names(sbs["rooms"], "sbs.rooms"),
+            every=timedelta(hours=every),
+            max_pages=pages,
+        ),
     )
 
 
