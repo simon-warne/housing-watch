@@ -1,0 +1,43 @@
+2026-11-26T21:02:49Z GET https://www.sbs.se/robots.txt -> 000 0 
+2026-11-26T21:02:55Z GET https://www.sbs.se/ -> 000 0 
+2026-11-26T21:03:12Z GET https://sbsstudent.se/robots.txt -> 200 117 text/plain; charset=utf-8
+2026-11-26T21:03:19Z GET https://sbsstudent.se/lediga-bostader/ -> 200 148741 text/html; charset=UTF-8
+2026-11-26T21:03:33Z GET https://sbsstudent.se/lediga-bostader/?qt_mll_search_tags=Stockholm -> 200 134893 text/html; charset=UTF-8
+2026-11-26T21:03:42Z GET https://sbsstudent.se/lediga-bostader/?qt_mll_search_tags=Stockholm&paged=2 -> 301 0 text/html; charset=UTF-8
+2026-11-26T21:03:48Z GET https://sbsstudent.se/lediga-bostader/nekvagen-23-lgh-1403/ -> 200 127335 text/html; charset=UTF-8
+2026-11-26T21:04:03Z GET https://sbsstudent.se/bostadsko/ -> 200 123703 text/html; charset=UTF-8
+2026-11-26T21:04:09Z GET https://sbsstudent.se/uthyrningspolicy/ -> 200 114825 text/html; charset=UTF-8
+2026-11-26T21:04:17Z GET https://studentbostad.sbsstudent.se/robots.txt -> 200 97 text/plain
+2026-11-26T21:04:23Z GET https://studentbostad.sbsstudent.se/bostad/p/8a87cf0e-b13e-4648-82fc-ca11d5c1c35a -> 200 2455 text/html
+2026-11-26T21:04:31Z GET https://studentbostad.sbsstudent.se/main.b17b8bf1164f1402.js -> 200 1285654 application/javascript
+2026-11-26T21:04:46Z GET https://www.homeq.se/robots.txt -> 200 74 text/plain;charset=UTF-8
+2026-11-26T21:04:52Z GET https://www.homeq.se/sok -> 404 10883 text/html; charset=utf-8
+2026-11-26T21:04:59Z GET https://api.homeq.se/robots.txt -> 404 88 application/json
+2026-11-26T21:05:04Z GET https://api.homeq.se/api-docs/ -> 200 93085 text/html; charset=utf-8
+2026-11-26T21:05:17Z GET https://www.homeq.se/anvandarvillkor -> 200 9790 text/html; charset=utf-8
+2026-11-26T21:05:33Z GET https://www.homeq.se/_next/static/X_QiTQw2y0rcGPpZDlcow/_buildManifest.js -> 200 11801 application/javascript; charset=UTF-8
+2026-11-26T21:05:39Z GET https://www.homeq.se/_next/static/chunks/pages/anvandarvillkor-82a308fad5944b1d.js?dpl=15539703 -> 200 2811 application/javascript; charset=UTF-8
+2026-11-26T21:05:53Z GET https://www.homeq.se/_next/static/chunks/pages/search-4793190225224188.js -> 200 135104 application/javascript; charset=UTF-8
+2026-11-26T21:05:59Z GET https://www.homeq.se/_next/static/chunks/2769-fdccf7fac8a325e1.js -> 200 9259 application/javascript; charset=UTF-8
+2026-11-26T21:06:41Z GET https://www.forvaltaren.se/robots.txt -> 404 128 text/plain; charset=utf-8
+2026-11-26T21:06:46Z GET https://www.forvaltaren.se/ -> 200 230596 text/html; charset=UTF-8
+2026-11-26T21:06:55Z GET https://www.forvaltaren.se/sok-ledigt/ -> 200 116336 text/html; charset=UTF-8
+2026-11-26T21:07:01Z GET https://www.forvaltaren.se/bli-hyresgast/sa-soker-du-lagenhet/kopoang/ -> 200 214721 text/html; charset=UTF-8
+2026-11-26T21:07:07Z GET https://www.forvaltaren.se/bli-hyresgast/sa-soker-du-lagenhet/kopoang/statistik-over-kopoang/ -> 200 222016 text/html; charset=UTF-8
+2026-11-26T21:07:33Z GET https://www.forvaltaren.se/app/themes/forvaltaren/public/search-objects-DVsf5fBu.js -> 200 21892 application/javascript; charset=utf-8
+2026-11-26T21:07:44Z GET https://www.forvaltaren.se/wp-json/fv/v1/groups -> 200 553 application/json; charset=UTF-8
+2026-11-26T21:07:52Z GET https://www.forvaltaren.se/wp-json/fv/v1/objects?group_id=1&group_slug=lagenhet -> 200 70729 application/json; charset=UTF-8
+2026-11-26T21:08:12Z GET https://www.forvaltaren.se/objekt/73-32-1-0102 -> 200 141077 text/html; charset=UTF-8
+2026-11-26T21:08:20Z GET https://www.wallenstam.se/robots.txt -> 200 204 text/plain
+2026-11-26T21:08:26Z GET https://www.wallenstam.se/sv/bostader/lediga-bostader/ -> 200 81378 text/html; charset=utf-8
+2026-11-26T21:08:47Z GET https://www.wallenstam.se/sv/bostader/bostadsko/sa-har-hyr-vi-ut/ -> 200 80511 text/html; charset=utf-8
+2026-11-26T21:08:55Z GET https://heimstaden.com/robots.txt -> 200 501 text/plain; charset=utf-8
+2026-11-26T21:09:01Z GET https://heimstaden.com/se/sv/lediga-lagenheter/ -> 301 0 text/html; charset=UTF-8
+2026-11-26T21:09:08Z HEAD https://heimstaden.com/se/sv/lediga-lagenheter/ (redirect target only)
+2026-11-26T21:09:17Z GET https://heimstaden.com/se/lediga-lagenheter/ -> 404 258328 text/html; charset=UTF-8
+2026-11-26T21:09:32Z GET https://heimstaden.com/se/sok-lagenhet/?text=&number_of_rooms_min=1&number_of_rooms_max=10&rent_min=0&rent_max=26000&size_min=0&size_max=300&object_type=apartments -> 200 3849033 text/html; charset=UTF-8
+2026-11-26T21:09:38Z GET https://heimstaden.com/se/blanketter/uthyrningspolicy-studentbostad/ -> 200 272663 text/html; charset=UTF-8
+2026-11-26T21:09:58Z GET https://heimstaden.com/se/sok-lagenhet/Bandhagen-33m²-6937101-1210/ -> 200 333571 text/html; charset=UTF-8
+2026-11-26T21:10:05Z GET https://www.stenafastigheter.se/robots.txt -> 200 82 text/plain
+2026-11-26T21:10:11Z GET https://www.stenafastigheter.se/ -> 200 159680 text/html; charset=utf-8
+2026-11-26T21:10:18Z GET https://www.stenafastigheter.se/bostader/hyra-bostad/ -> 200 122570 text/html; charset=utf-8
