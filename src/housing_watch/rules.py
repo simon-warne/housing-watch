@@ -13,6 +13,7 @@ from enum import StrEnum
 from housing_watch.bf import BfDetail, BfListing
 from housing_watch.config import Config
 from housing_watch.fv import FvDetail, FvListing
+from housing_watch.heimstaden import HsListing
 from housing_watch.sbs import SbsListing
 from housing_watch.sssb import Listing
 
@@ -259,19 +260,40 @@ class SbsVerdict:
     window: str  # "in", "early", "late" or "agreement" (Enligt överenskommelse)
 
 
+def _list_window(move_in: date | None, cfg: Config) -> str:
+    if move_in is None:
+        return "agreement"
+    if move_in < cfg.move_in_from:
+        return "early"
+    if move_in > cfg.move_in_to:
+        return "late"
+    return "in"
+
+
 def sbs_classify(x: SbsListing, cfg: Config) -> SbsVerdict:
-    if x.move_in is None:
-        window = "agreement"
-    elif x.move_in < cfg.move_in_from:
-        window = "early"
-    elif x.move_in > cfg.move_in_to:
-        window = "late"
-    else:
-        window = "in"
+    window = _list_window(x.move_in, cfg)
     return SbsVerdict(
         listing=x,
         watched=x.rooms.casefold() in (r.casefold() for r in cfg.sbs.rooms),
         over_budget=x.rent > cfg.rent_max,
         short_term=x.tag.casefold().startswith("korttid"),
         window=window,
+    )
+
+
+# --- Heimstaden (M6): digest only, no competition figure (Simon, 2026-11-26) ---
+@dataclass(frozen=True)
+class HsVerdict:
+    listing: HsListing
+    watched: bool  # rooms in cfg.heimstaden.rooms; else "other type"
+    over_budget: bool  # rent > rent.max; no stretch (Simon, 2026-11-27)
+    window: str  # "in", "early", "late" or "agreement" (Nu / enligt överenskommelse)
+
+
+def hs_classify(x: HsListing, cfg: Config) -> HsVerdict:
+    return HsVerdict(
+        listing=x,
+        watched=x.rooms.casefold() in (r.casefold() for r in cfg.heimstaden.rooms),
+        over_budget=x.rent > cfg.rent_max,
+        window=_list_window(x.move_in, cfg),
     )
