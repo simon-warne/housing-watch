@@ -3,16 +3,16 @@
 Digest only: Heimstaden shows no competition figure (Simon, 2026-11-26). One logged-out page
 carries every Swedish listing, both as HTML cards and as the embedded JSON
 `window.hose_objects_data = {"total_nr_of_objects": N, "objects": [...]}`; we read the JSON.
-Strict like `sssb.py`: anything unexpected raises `ParseError`, the object count must equal
-the total, and every listing (in scope or not) must parse. Only listings whose
+Strict like `sssb.py`: anything unexpected in a district listing raises `ParseError`; the
+object count must equal the total and every id must be unique. Only listings whose
 `district_name` is the configured district (Stor-Stockholm, Simon 2026-11-27) are returned.
 """
 
-import gzip
 import json
 import re
 import urllib.error
 import urllib.request
+import zlib
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -62,15 +62,19 @@ def _date(raw: str, nr: str) -> date:
         raise ParseError("available_from_date", raw, nr) from None
 
 
-def _listing(o: Any, seen_at: datetime) -> tuple[str, HsListing]:
+def _id_district(o: Any) -> tuple[str, str]:
+    """Checked for every listing in Sweden; the rest only inside the district (M6 review)."""
     if not isinstance(o, dict):
         raise ParseError("object", type(o).__name__)
     nr = o.get("rental_object_id")
     if not isinstance(nr, str) or not re.fullmatch(r"\d+-\d+", nr):
         raise ParseError("rental_object_id", nr)
+    return nr, _text(o, "district_name", nr)
+
+
+def _listing(o: dict, nr: str, seen_at: datetime) -> HsListing:
     if o.get("publish_status") != "published":
         raise ParseError("publish_status", o.get("publish_status"), nr)
-    district = _text(o, "district_name", nr)
     rent_raw = o.get("rental_cost")
     if not isinstance(rent_raw, str) or not _RENT.fullmatch(rent_raw):
         raise ParseError("rental_cost", rent_raw, nr)
@@ -89,7 +93,7 @@ def _listing(o: Any, seen_at: datetime) -> tuple[str, HsListing]:
     labels = o.get("labels")
     if not isinstance(labels, list) or not all(isinstance(x, str) and x.strip() for x in labels):
         raise ParseError("labels", labels, nr)
-    return district, HsListing(
+    return HsListing(
         id=nr,
         location=_text(o, "location", nr),
         address=_text(o, "street_address", nr),
@@ -104,7 +108,8 @@ def _listing(o: Any, seen_at: datetime) -> tuple[str, HsListing]:
 
 
 def parse_hs_page(page: str, seen_at: datetime, district: str) -> list[HsListing]:
-    """The listings in `district`, after checking every listing on the page parses."""
+    """The listings in `district`. Every listing in Sweden counts toward the total and needs
+    an id and a district; only those in `district` are parsed strictly."""
     if seen_at.tzinfo is None:
         raise ParseError("seen_at", seen_at, why="must be tz-aware")
     if not isinstance(page, str) or page.count(_MARK) != 1:
@@ -118,10 +123,11 @@ def parse_hs_page(page: str, seen_at: datetime, district: str) -> list[HsListing
     total, objs = d.get("total_nr_of_objects"), d["objects"]
     if type(total) is not int or total <= 0 or len(objs) != total:
         raise ParseError("total_nr_of_objects", (total, len(objs)), why="count ≠ total")
-    out = [_listing(o, seen_at) for o in objs]
-    if len({x.id for _, x in out}) != len(out):
-        raise ParseError("rental_object_id", len(out), why="duplicate ids")
-    return [x for dist, x in out if dist == district]
+    keys = [(o, *_id_district(o)) for o in objs]
+    if len({nr for _, nr, _ in keys}) != len(keys):
+        raise ParseError("rental_object_id", len(keys), why="duplicate ids")
+    # An odd listing elsewhere in Sweden must not stop the source (M6 review, Claude).
+    return [_listing(o, nr, seen_at) for o, nr, dist in keys if dist == district]
 
 
 def allowed(url: str) -> bool:
@@ -150,7 +156,8 @@ def hs_get(url: str, *, opener=None) -> str:
         enc = (resp.headers.get("Content-Encoding") or "").strip().lower()
         charset = resp.headers.get_content_charset() or "utf-8"
     if enc == "gzip":
-        body = gzip.decompress(body)
+        d = zlib.decompressobj(16 + zlib.MAX_WBITS)  # capped: no gzip bomb
+        body = d.decompress(body, MAX_BYTES + 1)
     elif enc not in ("", "identity"):
         raise ValueError(f"Heimstaden sent an unexpected encoding: {enc}")
     if len(body) > MAX_BYTES:

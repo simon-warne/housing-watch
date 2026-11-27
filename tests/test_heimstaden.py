@@ -184,13 +184,35 @@ def test_strict(page):
         parse_hs_page(page, SEEN, DISTRICT)
 
 
-def test_out_of_district_listing_must_still_parse():
-    # A broken listing elsewhere still means the page changed shape.
+def _malmo(**changes) -> str:
     d = data()
     (o,) = [o for o in d["objects"] if o["district_name"] == "Stor-Malmö"][:1]
-    o["rental_cost"] = ""
+    o.update(changes)
+    return page_with(d)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"rental_cost": ""},
+        {"labels": [{"name": "Nyproduktion"}]},
+        {"publish_status": "draft"},
+        {"available_from_date": "Snart"},
+        {"size_main": None},
+    ],
+)
+def test_an_odd_listing_outside_the_district_is_ignored(changes):
+    # Review M6 HS: one odd listing elsewhere in Sweden must not stop the source.
+    assert len(parse_hs_page(_malmo(**changes), SEEN, DISTRICT)) == 20
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"rental_object_id": None}, {"rental_object_id": "6937101-1210"}, {"district_name": ""}],
+)
+def test_outside_the_district_id_and_district_must_still_be_there(changes):
     with pytest.raises(ParseError):
-        parse_hs_page(page_with(d), SEEN, DISTRICT)
+        parse_hs_page(_malmo(**changes), SEEN, DISTRICT)
 
 
 def test_seen_at_must_be_tz_aware():
@@ -279,3 +301,11 @@ def test_hs_get_follows_no_redirect():
     h = _NoRedirects()
     with pytest.raises(urllib.error.HTTPError):
         h.redirect_request(None, None, 301, "Moved", {}, LIST_URL)
+
+
+def test_hs_get_caps_a_gzip_bomb():
+    import housing_watch.heimstaden as hs
+
+    bomb = gzip.compress(b"\0" * (hs.MAX_BYTES + 10))
+    with pytest.raises(ValueError):
+        hs_get(LIST_URL, opener=lambda r, timeout: Resp(bomb, "gzip"))
