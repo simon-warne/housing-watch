@@ -20,7 +20,7 @@ STHLM = ZoneInfo("Europe/Stockholm")
 T0 = datetime(2026, 11, 26, 19, 37, tzinfo=UTC)  # 20:37 Stockholm
 RISSNE = "73-32-1-0102"  # 5,990 kr, closes today 23:59: in the last-call window at T0
 DUVBO = "61-10-1-302"  # 4,290 kr, closes 30 Nov 23:59
-ENV_FV = {**ENV, "FV_POINTS": "3994", "FV_POINTS_ON": "2026-11-20"}  # made up: 4,000 on 26 Nov
+ENV_FV = {**ENV, "FV_POINTS_AT": "3994@2026-11-20"}  # made up: 4,000 on 26 Nov
 DUVBO_CLOSE = datetime(2026, 11, 30, 23, 59, tzinfo=STHLM)
 BASE = "https://www.forvaltaren.se/objekt/"
 
@@ -203,7 +203,7 @@ def test_no_points_records_but_does_not_alert(tmp_path, sssb, fv):
 
 
 @pytest.mark.parametrize(
-    "bad", [{"FV_POINTS": "many"}, {"FV_POINTS_ON": "2026-12-01"}, {"FV_POINTS_ON": ""}]
+    "bad", [{"FV_POINTS_AT": "many"}, {"FV_POINTS_AT": "3994@2026-12-01"}, {"FV_POINTS_AT": "3994"}]
 )
 def test_bad_points_stop_only_fv_and_leave_a_note(tmp_path, sssb, fv, bad, capsys):
     """Simon, 2026-11-26: a bad FV secret stops FV's part only, with a note on the phone."""
@@ -211,7 +211,7 @@ def test_bad_points_stop_only_fv_and_leave_a_note(tmp_path, sssb, fv, bad, capsy
     assert rc == 1 and fv.calls == [] and sssb.calls  # SSSB still ran
     assert capsys.readouterr().out.strip() == "ok: 24 listings · fv failed: ConfigError"
     [note] = [a for a in phone.got if a.kind == "setup"]
-    assert note.title == "FV: setup problem, not watching" and "FV_POINTS" in note.body
+    assert note.title == "FV: setup problem, not watching" and "FV_POINTS_AT" in note.body
     for v in bad.values():
         assert not v or v not in note.body  # never echoes the secret
     assert len(phone.got) == 7  # SSSB's 6 winnable + the note
@@ -250,8 +250,10 @@ def _trace(tmp_path, env):
 
 
 def test_public_traces_do_not_depend_on_fv_points(tmp_path):
-    a, sent_a = _trace(tmp_path / "a", {**ENV_FV, "FV_POINTS": "9000"})  # wins everything
-    b, sent_b = _trace(tmp_path / "b", {**ENV_FV, "FV_POINTS": "10"})  # wins nothing
+    a, sent_a = _trace(
+        tmp_path / "a", {**ENV_FV, "FV_POINTS_AT": "9000@2026-11-20"}
+    )  # wins everything
+    b, sent_b = _trace(tmp_path / "b", {**ENV_FV, "FV_POINTS_AT": "10@2026-11-20"})  # wins nothing
     assert sent_a and not sent_b  # the private outcome differs...
     assert a == b  # ...the public trace doesn't
 

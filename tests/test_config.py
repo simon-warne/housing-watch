@@ -207,7 +207,7 @@ TODAY = date(2026, 11, 26)
 
 
 def test_fv_points_grow_one_a_day():
-    p = load_fv_points({"FV_POINTS": "1200", "FV_POINTS_ON": "2026-11-20"}, TODAY)
+    p = load_fv_points({"FV_POINTS_AT": "1200@2026-11-20"}, TODAY)
     assert p == FvPoints(base=1200, base_date=date(2026, 11, 20))
     assert p.on(date(2026, 11, 20)) == 1200
     assert p.on(TODAY) == 1206
@@ -215,20 +215,31 @@ def test_fv_points_grow_one_a_day():
 
 def test_fv_points_unset_is_none():
     assert load_fv_points({}, TODAY) is None
-    assert load_fv_points({"FV_POINTS": " ", "FV_POINTS_ON": ""}, TODAY) is None
+    assert load_fv_points({"FV_POINTS_AT": " "}, TODAY) is None
+
+
+def test_fv_points_zero_and_spaces_around():
+    assert load_fv_points({"FV_POINTS_AT": " 0@2026-11-26\n"}, TODAY) == FvPoints(
+        base=0, base_date=TODAY
+    )
 
 
 @pytest.mark.parametrize(
     "env",
     [
-        {"FV_POINTS": "1200"},  # no date
-        {"FV_POINTS_ON": "2026-11-20"},  # no points
-        {"FV_POINTS": "12.5", "FV_POINTS_ON": "2026-11-20"},
-        {"FV_POINTS": "-3", "FV_POINTS_ON": "2026-11-20"},
-        {"FV_POINTS": "1200000", "FV_POINTS_ON": "2026-11-20"},
-        {"FV_POINTS": "1200", "FV_POINTS_ON": "20261120"},
-        {"FV_POINTS": "1200", "FV_POINTS_ON": "2026-02-30"},
-        {"FV_POINTS": "1200", "FV_POINTS_ON": "2026-11-27"},  # in the future
+        {"FV_POINTS_AT": "1200"},  # no date
+        {"FV_POINTS_AT": "1200@"},
+        {"FV_POINTS_AT": "@2026-11-20"},  # no points
+        {"FV_POINTS_AT": "2026-11-20"},
+        {"FV_POINTS_AT": "12.5@2026-11-20"},
+        {"FV_POINTS_AT": "-3@2026-11-20"},
+        {"FV_POINTS_AT": "1200000@2026-11-20"},
+        {"FV_POINTS_AT": "1200 @ 2026-11-20"},
+        {"FV_POINTS_AT": "1200@2026-11-20@1"},
+        {"FV_POINTS_AT": "1200@20261120"},
+        {"FV_POINTS_AT": "1200@2026-02-30"},
+        {"FV_POINTS_AT": "1200@2026-11-27"},  # in the future
+        {"FV_POINTS": "1200", "FV_POINTS_ON": "2026-11-20"},  # the old two secrets
     ],
 )
 def test_bad_fv_points_raise_without_echo(env):

@@ -45,8 +45,7 @@ jobs:
           QUEUE_DAYS: ${{ secrets.QUEUE_DAYS }}
           QUEUE_DAYS_UNTIL: ${{ secrets.QUEUE_DAYS_UNTIL }}
           BF_QUEUE_SINCE: ${{ secrets.BF_QUEUE_SINCE }}
-          FV_POINTS: ${{ secrets.FV_POINTS }}
-          FV_POINTS_ON: ${{ secrets.FV_POINTS_ON }}
+          FV_POINTS_AT: ${{ secrets.FV_POINTS_AT }}
           BOOKED_IDS: ${{ vars.BOOKED_IDS }}
           INIT: ${{ steps.data.outputs.init }}
         run: uv run --no-dev python -m housing_watch.run --data data ${INIT:+--init}

@@ -294,22 +294,27 @@ def load_bf_since(env: Mapping[str, str]) -> date | None:
 
 
 def load_fv_points(env: Mapping[str, str], today: date) -> FvPoints | None:
-    """FV_POINTS="<points>", FV_POINTS_ON="YYYY-MM-DD" (secrets). Both unset = no FV alerts."""
-    raw = (env.get("FV_POINTS") or "").strip()
-    on = (env.get("FV_POINTS_ON") or "").strip()
-    if not raw and not on:
+    """FV_POINTS_AT="<points>@YYYY-MM-DD" (one secret: the points and the day they were read).
+
+    Unset = no FV alerts. One long value, because GitHub masks every log string equal to a
+    secret: a points-only secret like "0" hid every 0 in the public logs (Simon, 2026-11-27).
+    The old FV_POINTS/FV_POINTS_ON raise, so a leftover can't silently stop FV alerts.
+    """
+    if env.get("FV_POINTS") or env.get("FV_POINTS_ON"):
+        raise ConfigError("FV_POINTS/FV_POINTS_ON are replaced by FV_POINTS_AT")
+    raw = (env.get("FV_POINTS_AT") or "").strip()
+    if not raw:
         return None
-    if not re.fullmatch(r"\d{1,6}", raw):
-        raise ConfigError("FV_POINTS: missing or not a whole number (at most 6 digits)")
+    m = re.fullmatch(r"(\d{1,6})@(\d{4}-\d{2}-\d{2})", raw)
     try:
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", on):
+        if not m:
             raise ValueError
-        base_date = date.fromisoformat(on)
+        base_date = date.fromisoformat(m[2])
     except ValueError:
-        raise ConfigError('FV_POINTS_ON: missing or not "YYYY-MM-DD"') from None
+        raise ConfigError('FV_POINTS_AT: not "<points>@YYYY-MM-DD"') from None
     if base_date > today:
-        raise ConfigError("FV_POINTS_ON is in the future")
-    return FvPoints(base=int(raw), base_date=base_date)
+        raise ConfigError("FV_POINTS_AT: the date is in the future")
+    return FvPoints(base=int(m[1]), base_date=base_date)
 
 
 def load_booked(env: Mapping[str, str]) -> frozenset[str]:

@@ -16,8 +16,7 @@ ALLOWED_SECRETS = {
     "QUEUE_DAYS",
     "QUEUE_DAYS_UNTIL",
     "BF_QUEUE_SINCE",
-    "FV_POINTS",
-    "FV_POINTS_ON",
+    "FV_POINTS_AT",
 }
 
 
@@ -97,5 +96,5 @@ def test_watch_step_gets_the_bf_queue_date():
 
 def test_watch_step_gets_the_fv_points():
     env = _step("Watch")["env"]
-    assert env["FV_POINTS"] == "${{ secrets.FV_POINTS }}"
-    assert env["FV_POINTS_ON"] == "${{ secrets.FV_POINTS_ON }}"
+    assert env["FV_POINTS_AT"] == "${{ secrets.FV_POINTS_AT }}"
+    assert "FV_POINTS" not in env and "FV_POINTS_ON" not in env

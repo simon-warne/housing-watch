@@ -1,5 +1,5 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 10:35, M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-27 10:55, FV points moved to one secret `FV_POINTS_AT` (not pushed); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
 - Pushed: everything incl. M6 Heimstaden (5123e71, tag `m6-hs`); CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
@@ -9,7 +9,7 @@ Updated: 2026-11-27 10:35, M6 Heimstaden done and pushed (tag `m6-hs`). Earlier 
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-1. **Secrets (found 27 Nov):** `FV_POINTS` is "0", so GitHub masks every `0` in the public logs (`DEP***169`, `2***26`) since 26 Nov 21:19 UTC; and the variable `BOOKED_IDS` holds `2027-09-30` (a date, not an objektNr; the `_ID` regex accepts it). Waiting for Simon's choice.
+1. **Simon: add secret `FV_POINTS_AT`** = `<points>@<YYYY-MM-DD>` (the points and the day they were read, e.g. points 0 on the join day), then push. Until both are done, the live run has no Förvaltaren points, so no FV alerts (the FV list and digest still run). `FV_POINTS`, `FV_POINTS_ON` and `BOOKED_IDS` are deleted (the old FV secret "0" masked every 0 in public logs; BOOKED_IDS held a date by mistake). Optional: delete the runs since 26 Nov 21:19 UTC with masked zeros (`gh run delete <id>`).
 2. **Watch scheduling:** `gh run list -w watch`. Scheduled runs should come about every 30 min. If they're still hours apart by 28 Nov, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
@@ -42,6 +42,7 @@ Updated: 2026-11-27 10:35, M6 Heimstaden done and pushed (tag `m6-hs`). Earlier 
 - SSSB's `detaljUrl` is `http://`; alerts upgrade it to https.
 - Tests that span days must allow for queue days growing (Pax, top 182, is tied on 28 Nov with 180 + 2).
 - Never write real queue days into docs or plans: use placeholders.
+- GitHub masks every log string equal to a secret: a short secret ("0") hides every match in public logs and shows that a secret has that value. Keep secrets long (`FV_POINTS_AT` = `<points>@<date>`). `BOOKED_IDS`'s pattern also accepts a date.
 - **Public signals leak too:** which listings get requests, the step's run time, and file sizes. Anything that varies with my days or bookings must not reach public history, logs or timing (`test_public_traces_do_not_depend_on_queue_days_or_bookings`).
 - A size test needs enough alerts to grow SQLite pages, or it passes without padding.
 - PyYAML reads a bare `on:` key as `True`.

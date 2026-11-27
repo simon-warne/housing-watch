@@ -380,7 +380,7 @@ def run(
 
     Setup problems (config, QUEUE_DAYS, key, missing or unexpected files, a shrinking
     history) raise instead, before `ready` exists, so nothing is pushed. A bad per-source
-    secret (BF_QUEUE_SINCE, FV_POINTS/FV_POINTS_ON) fails only that source's part, with one
+    secret (BF_QUEUE_SINCE, FV_POINTS_AT) fails only that source's part, with one
     `setup` note per problem.
     """
     if now.tzinfo is None:
