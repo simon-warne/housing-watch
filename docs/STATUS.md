@@ -1,15 +1,15 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27, M6 Heimstaden done (tag `m6-hs`, **not pushed**). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-27 10:35, M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
-- Pushed: everything up to 1305c10. **Not pushed:** M6 Heimstaden (a0fbfa9..HEAD, tag `m6-hs`). Claude can't push.
+- Pushed: everything incl. M6 Heimstaden (5123e71, tag `m6-hs`); CI green. No run has fetched Heimstaden yet. Claude can't push.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
-- Scheduling: only one scheduled run fired overnight (02:23 UTC); the keep-alive change went out with the hotfix push this morning. Too early to judge.
+- Scheduling: still only one scheduled run ever (02:23 UTC, failed on the BF ParseError the hotfix fixed); none from 02:23 to 09:30 UTC. Workflow state `active`. Too early to judge (deadline 28 Nov).
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-1. **Simon: push** (main + tag `m6-hs`). The first run that fetches Heimstaden should log `· hs ok: 20` (or the count then).
+1. The first run that fetches Heimstaden should log `· hs ok: 20` (or the count then). Simon can start one now with `gh workflow run watch.yml`.
 2. **Watch scheduling:** `gh run list -w watch`. Scheduled runs should come about every 30 min. If they're still hours apart by 28 Nov, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
