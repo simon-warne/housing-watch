@@ -1,29 +1,30 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 (later), hotfix: BF empty queue list + weekly keep-alive (not pushed). Before that: M6 SBS done (tag `m6-sbs` moved to include Simon's follow-ups: empty list, retry after failure; not pushed). Earlier: M6 Förvaltaren (tag `m6-fv` pushed) and its follow-ups (not pushed). Reports: `docs/reports/M0.md` to `M6.md`.
+Updated: 2026-11-27, M6 Heimstaden done (tag `m6-hs`, **not pushed**). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
-- Everything up to cce9568 (with tags `m6-fv`, `m6-sbs`) is pushed. **The hotfix commit after it is not** (Claude can't push).
-- **Hotfix 2026-11-27:** the first scheduled run (02:23 UTC) logged `ok: 24 listings · bf failed: ParseError · fv ok: 17`. Cause: a BF listing with no applicants shows the queue heading with an empty `<ul>`, which the parser rejected (2 of 10 live detail pages; every BF run would have failed until 2 Dec). Now it reads as no applicants (Simon). Also, only that one scheduled run fired in ~12 h, so the keep-alive `enable` call now runs only Sundays 03 UTC (Simon; the cause is a guess).
-- M5: Bostadsförmedlingen runs in the same scheduled run after SSSB, with its own guard and heartbeat. BF alerts are tagged "BF ·" and the weekly digest has a BF section. 408 tests pass.
-- M6 Förvaltaren: third source in the same run (own guard, heartbeat, digest section), "FV ·" alerts from `FV_POINTS`/`FV_POINTS_ON`. 549 tests pass. Report: `docs/reports/M6.md` part B.
-- M6 SBS: fourth source, **digest only** (list pages only, own 6 h guard, heartbeat, digest section after FV). 662 tests pass. Report: `docs/reports/M6.md` part C.
+- Pushed: everything up to 1305c10. **Not pushed:** M6 Heimstaden (a0fbfa9..HEAD, tag `m6-hs`). Claude can't push.
+- Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
+- M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
+- Scheduling: only one scheduled run fired overnight (02:23 UTC); the keep-alive change went out with the hotfix push this morning. Too early to judge.
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-1. ~~Secrets, push, **watch** with `test_alert` + one normal run~~: done 2026-11-26 (Simon: worked).
-2. Check Mina sidor's number against the computed one, and when the daily +1 lands.
-3. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
-4. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`).
-5. **Simon: push** the hotfix. Then watch `gh run list -w watch`: scheduled runs should come about every 30 min, each with `bf ok: N`. If they're still hours apart a day after the push, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support. After you apply for an FV flat: check that "Högst köpoäng" equals your points (the off-by-one risk).
-6. Sunday's digest should have an "SBS:" line, and the run log `… · sbs ok: 16` (or the count then).
-7. **Next session: M6 Heimstaden** (digest only; plan first, tests first), then Wallenstam after 1 Dec, HomeQ (check terms, one POST search).
+1. **Simon: push** (main + tag `m6-hs`). The first run that fetches Heimstaden should log `· hs ok: 20` (or the count then).
+2. **Watch scheduling:** `gh run list -w watch`. Scheduled runs should come about every 30 min. If they're still hours apart by 28 Nov, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support.
+3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
+4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
+5. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
+6. On the first real BF last call: check whether BF really closes at 23:59 (`bf.CLOSES_AT`). After you apply for an FV flat: check that "Högst köpoäng" equals your points.
+7. **Next session: M6 Wallenstam**, after its relaunch on 1 Dec (re-check the site first, plan first). Then HomeQ (read its terms, then one POST search).
 
 ## Open for Simon
+- Log in to Heimstaden every 180 days (account deleted otherwise) and to Förvaltaren once a year.
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.
 - Detail cap of 10 (per source): raise it? BF listings closing tonight take most of the 10 slots until they close.
 - BF lines in the digest get cut off when about 100 BF rows are in scope (backlog: only listings with a chance, or a separate BF digest).
 
 ## Gotchas learned
+- Heimstaden: one page (~3.8 MB) holds all of Sweden. Read the embedded `window.hose_objects_data` JSON, not the cards. "Ort" in `location` is unreliable (Åkersberga shows as "Stockholm"), so scope uses `district_name`. A past `available_from_date` is shown as "Nu / enligt överenskommelse". Only district listings are parsed strictly; `labels`/`restriction` are always `[]`/"0" so far.
 - BF detail with no applicants: the "Längsta anmälda kötider" heading stays, with an empty `<ul>`. Only whitespace inside reads as none; anything else odd raises.
 - SBS: the site's `?paged=N` link 301s to `/lediga-bostader/page/N/?qt_mll_search_tags=Stockholm`; request that directly. Cards have everything (no detail pages); the id is the URL slug; move-in can be "Enligt överenskommelse". `urllib` follows redirects by default: `sbs_get` uses its own handler (list pages only, one hop).
 - SBS empty result is `<p>Inga lägenheter matchar dina filterinställningar.</p>` in `div.listings`; only that shape reads as 0 listings. SBS's 6 h wait counts from the last *successful* fetch (`sbs_last_fetch_ok`).
