@@ -1,15 +1,15 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 10:55, FV points moved to one secret `FV_POINTS_AT` (not pushed); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-27 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed, secret set); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
 - Pushed: everything incl. M6 Heimstaden (5123e71, tag `m6-hs`); CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
-- Scheduling: still only one scheduled run ever (02:23 UTC, failed on the BF ParseError the hotfix fixed); none from 02:23 to 09:30 UTC. Workflow state `active`. Too early to judge (deadline 28 Nov).
+- Scheduling: two scheduled runs so far (02:23 UTC, failed on the BF ParseError the hotfix fixed; 11:22 UTC ok), nothing between. Workflow state `active`. Too early to judge (deadline 28 Nov).
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-1. **Simon: add secret `FV_POINTS_AT`** = `<points>@<YYYY-MM-DD>` (the points and the day they were read, e.g. points 0 on the join day), then push. Until both are done, the live run has no Förvaltaren points, so no FV alerts (the FV list and digest still run). `FV_POINTS`, `FV_POINTS_ON` and `BOOKED_IDS` are deleted (the old FV secret "0" masked every 0 in public logs; BOOKED_IDS held a date by mistake). Optional: delete the runs since 26 Nov 21:19 UTC with masked zeros (`gh run delete <id>`).
+1. **Check the next watch run** (FV_POINTS_AT added 11:42 UTC and pushed; the 4 watch runs with masked zeros deleted): the log shows `Version: 2026…` (no `***`) and `fv ok: N`, and no "FV: setup problem" note on the phone.
 2. **Watch scheduling:** `gh run list -w watch`. Scheduled runs should come about every 30 min. If they're still hours apart by 28 Nov, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
