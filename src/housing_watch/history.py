@@ -740,16 +740,23 @@ def sbs_seen_since(
 
 
 def sbs_record(
-    conn: sqlite3.Connection, listings: Sequence[SbsListing], seen_at: datetime
+    conn: sqlite3.Connection,
+    listings: Sequence[SbsListing],
+    seen_at: datetime,
+    *,
+    confirmed_empty: bool = False,
 ) -> SbsChanges:
-    """A row only on change; an empty run writes nothing (and removes nothing)."""
+    """A row only on change; an empty run writes and removes nothing, unless the site said
+    "no results" (`confirmed_empty`, Simon 2026-11-27): then every active listing is removed."""
     seen = _ts(seen_at)
+    if confirmed_empty and listings:
+        raise ValueError("confirmed_empty with listings")
     ids = [x.id for x in listings]
     if len(set(ids)) != len(ids):
         raise ValueError("duplicate listing ids")
     if any(x.seen_at != seen_at for x in listings):
         raise ValueError("listing seen_at differs from the run's seen_at")
-    if not listings:
+    if not listings and not confirmed_empty:
         return SbsChanges(new=[], changed=[], removed=[], unchanged=0)
 
     new: list[SbsListing] = []

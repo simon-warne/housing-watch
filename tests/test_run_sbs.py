@@ -123,8 +123,9 @@ def test_sbs_failure_does_not_stop_sssb(tmp_path, sssb, sbs, capsys):
     rc, phone, _ = go(tmp_path, sssb, sbs, T0)
     assert rc == 1 and len(phone.got) == 6
     assert capsys.readouterr().out.strip() == "ok: 24 listings · sbs failed: OSError"
+    # A failure is retried next run (Simon, 2026-11-27): the heartbeat comes within ~1 h.
     for i in (1, 2):
-        _, phone, _ = go(tmp_path, sssb, sbs, T0 + SIX_H * i)
+        _, phone, _ = go(tmp_path, sssb, sbs, T0 + timedelta(minutes=30 * i))
     assert [a.title.split(" failed")[0] for a in phone.got if a.kind == "heartbeat"] == ["SBS: 3"]
     assert state_rows(tmp_path, "SELECT value FROM meta WHERE key = 'fail_count'") == []
 
@@ -201,3 +202,33 @@ def test_shrinking_sbs_history_aborts(tmp_path, sssb, sbs, monkeypatch):
     with pytest.raises(RuntimeError, match="shrank"):
         go(tmp_path, sssb, sbs, T0 + SIX_H)
     assert not (tmp_path / "ready").exists()
+
+
+def test_a_failed_fetch_is_retried_next_run_but_not_sooner(tmp_path, sssb, sbs):
+    sbs.fail = OSError("down")
+    go(tmp_path, sssb, sbs, T0)
+    sbs.calls.clear()
+    go(tmp_path, sssb, sbs, T0 + timedelta(minutes=10))  # the 25-min guard still holds
+    assert sbs.calls == []
+    sbs.fail = None
+    go(tmp_path, sssb, sbs, T0 + timedelta(minutes=30))
+    assert sbs.calls == [page_url(1), page_url(2)]
+    sbs.calls.clear()
+    # After a success, back to every 6 h.
+    for m in (60, 90, 300):
+        go(tmp_path, sssb, sbs, T0 + timedelta(minutes=m))
+    assert sbs.calls == []
+    go(tmp_path, sssb, sbs, T0 + timedelta(minutes=30) + SIX_H)
+    assert sbs.calls == [page_url(1), page_url(2)]
+
+
+def test_an_empty_list_closes_every_listing(tmp_path, sssb, sbs, capsys):
+    go(tmp_path, sssb, sbs, T0)
+    capsys.readouterr()
+    empty = (FIX / "2026-11-27-lediga-stockholm-empty.html").read_text("utf-8")
+    sbs.pages = {page_url(1): empty}
+    rc, phone, _ = go(tmp_path, sssb, sbs, T0 + SIX_H)
+    assert rc == 0 and not any(a.kind == "heartbeat" for a in phone.got)
+    assert capsys.readouterr().out.strip().endswith("sbs ok: 0")
+    assert count(tmp_path, "SELECT COUNT(*) FROM sbs_listings WHERE removed_at IS NULL") == 0
+    assert count(tmp_path, "SELECT COUNT(*) FROM sbs_observations") == 16

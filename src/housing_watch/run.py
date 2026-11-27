@@ -295,9 +295,8 @@ def _watch_fv(hist, cfg, points, state, now, get, sleep) -> tuple[int, list]:
 def _watch_sbs(hist, cfg, now, get, sleep) -> tuple[int, list]:
     """SBS is digest only: record the list pages, no alerts (Simon, 2026-11-26)."""
     listings = fetch_sbs(get, sleep, now, max_pages=cfg.sbs.max_pages, pause=PAUSE_S)
-    if not listings:
-        raise EmptyRun("0 SBS listings parsed")
-    sbs_record(hist, listings, now)
+    # fetch_sbs returns [] only for the site's exact "no results" page (Simon, 2026-11-27).
+    sbs_record(hist, listings, now, confirmed_empty=not listings)
     return len(listings), []
 
 
@@ -404,14 +403,21 @@ def run(
             parts: list[str] = []
             ok: list[str] = []
 
-            def part(name, meta_key, label, work, guard=GUARD):
+            def part(name, meta_key, label, work, ok_guard=None):
+                """`ok_guard`: also wait this long after the last *successful* fetch; a
+                failed one is retried next run (SBS, Simon 2026-11-27)."""
                 last = _meta(state, meta_key)
-                if last and now - datetime.fromisoformat(last) < guard:
+                last_ok = _meta(state, f"{meta_key}_ok") if ok_guard else None
+                if (last and now - datetime.fromisoformat(last) < GUARD) or (
+                    last_ok and now - datetime.fromisoformat(last_ok) < ok_guard
+                ):
                     parts.append(f"{label}skipped: recent fetch")
                     return
                 _set_meta(state, meta_key, now.astimezone(UTC).isoformat())
                 try:
                     n, found = work()
+                    if ok_guard:
+                        _set_meta(state, f"{meta_key}_ok", now.astimezone(UTC).isoformat())
                     run_ok(state, source=name)
                     alerts.extend(found)
                     parts.append(f"{label}ok: {n}" + ("" if name else " listings"))
@@ -455,7 +461,7 @@ def run(
                     "sbs_last_fetch",
                     "sbs ",
                     lambda: _watch_sbs(hist, cfg, now, sbs_get, sleep),
-                    guard=cfg.sbs.every - GUARD_SLACK,
+                    ok_guard=cfg.sbs.every - GUARD_SLACK,
                 )
             if ok:  # after every part, so it has this run's data and survives either failing
                 try:

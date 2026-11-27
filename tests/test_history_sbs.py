@@ -164,3 +164,17 @@ def test_v3_db_migrates_in_place_and_keeps_other_rows(tmp_path):
     names = {r[0] for r in raw.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     raw.close()
     assert {"sbs_listings", "sbs_observations"} <= names
+
+
+def test_a_confirmed_empty_list_removes_everything(conn, sbs0):
+    sbs_record(conn, sbs0, T0)
+    ch = sbs_record(conn, [], T1, confirmed_empty=True)
+    assert len(ch.removed) == 16 and sbs_active(conn) == []
+    assert n(conn, "sbs_observations") == 16  # history kept
+    ch = sbs_record(conn, at(sbs0, T2), T2)
+    assert len(ch.new) == 16
+
+
+def test_confirmed_empty_needs_an_empty_list(conn, sbs0):
+    with pytest.raises(ValueError):
+        sbs_record(conn, sbs0, T0, confirmed_empty=True)

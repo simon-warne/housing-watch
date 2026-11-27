@@ -31,6 +31,11 @@ _RENT = re.compile(r"(\d{1,3}(?:[ \xa0]\d{3})*) kr/mån")
 _SIZE = re.compile(r"(\d{1,3}) m²")
 _DATE = re.compile(r"(\d{1,2}) ([a-zåäö]+\.?) (\d{4})")
 BY_AGREEMENT = "Enligt överenskommelse"
+NO_RESULTS = "<p>Inga lägenheter matchar dina filterinställningar.</p>"
+# The site's empty result (fixture 2026-11-27-lediga-stockholm-empty.html), nothing else.
+_EMPTY = re.compile(
+    r'<div class="listings grid grid-col-1">\s*' + re.escape(NO_RESULTS) + r"\s*</div>"
+)
 CITY = "Stockholm"
 _MONTHS = {
     m: i
@@ -171,6 +176,16 @@ def parse_sbs_page(page: str, seen_at: datetime) -> SbsPage:
     if not isinstance(page, str):
         raise ParseError("page", type(page).__name__)
     ranges = _RANGE.findall(" ".join(htmllib.unescape(page).split()))
+    if NO_RESULTS in page:
+        # Only the exact empty shape reads as 0 listings (Simon, 2026-11-27).
+        if (
+            page.count(NO_RESULTS) == 1
+            and len(_EMPTY.findall(page)) == 1
+            and not ranges
+            and "card--listing" not in page
+        ):
+            return SbsPage(listings=[], first=0, last=0, total=0)
+        raise ParseError("Inga lägenheter", len(ranges), why="'no results' next to other content")
     if len(ranges) != 1:
         raise ParseError("Visar", ranges, why="expected one result range")
     first, last, total = (int(n) for n in ranges[0])
@@ -200,6 +215,8 @@ def fetch_sbs(
     n = 1
     while True:
         p = parse_sbs_page(get(page_url(n)), seen_at)
+        if n == 1 and p.total == 0:
+            return []  # the site's own "no results" page
         if p.first != len(out) + 1 or (total is not None and p.total != total):
             raise ParseError("Visar", (n, p.first, p.total), why="pages don't line up")
         total = p.total

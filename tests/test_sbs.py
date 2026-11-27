@@ -336,3 +336,50 @@ def test_a_redirect_is_followed_at_most_once():
     from housing_watch.sbs import _ListOnlyRedirects
 
     assert _ListOnlyRedirects.max_redirections == 1
+
+
+# --- an empty list (Simon, 2026-11-27): only the site's exact "no results" shape ---
+EMPTY = FIX / "2026-11-27-lediga-stockholm-empty.html"
+NO_RESULTS = "<p>Inga lägenheter matchar dina filterinställningar.</p>"
+
+
+def test_the_empty_result_page_is_zero_listings():
+    p = parse_sbs_page(text(EMPTY), SEEN)
+    assert (p.listings, p.first, p.last, p.total) == ([], 0, 0, 0)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        (NO_RESULTS, "<p>Något gick fel.</p>"),  # another message
+        (NO_RESULTS, ""),  # no message at all
+        (NO_RESULTS, NO_RESULTS + NO_RESULTS),  # twice
+        ('<div class="listings grid grid-col-1">', '<div class="other">'),  # outside the list
+    ],
+)
+def test_anything_else_without_cards_still_raises(change):
+    with pytest.raises(ParseError):
+        parse_sbs_page(edited(EMPTY, *change), SEEN)
+
+
+def test_no_results_text_next_to_cards_raises():
+    page = edited(
+        P2,
+        '<div class="listings-result-count">',
+        NO_RESULTS + '<div class="listings-result-count">',
+    )
+    with pytest.raises(ParseError):
+        parse_sbs_page(page, SEEN)
+
+
+def test_fetch_of_an_empty_list_is_one_request_and_no_listings():
+    get, calls = fake_get({page_url(1): text(EMPTY)})
+    sleeps: list[float] = []
+    assert fetch_sbs(get, sleeps.append, SEEN, max_pages=5, pause=5) == []
+    assert calls == [page_url(1)] and sleeps == []
+
+
+def test_an_empty_second_page_raises():
+    get, _ = fake_get({page_url(1): text(P1), page_url(2): text(EMPTY)})
+    with pytest.raises(ParseError):
+        fetch_sbs(get, lambda s: None, SEEN, max_pages=5, pause=5)
