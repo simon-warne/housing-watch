@@ -66,12 +66,15 @@ from housing_watch.fv import (
     parse_fv_detail,
     parse_fv_list,
 )
+from housing_watch.heimstaden import LIST_URL as HS_LIST_URL
+from housing_watch.heimstaden import hs_get, parse_hs_page
 from housing_watch.history import (
     bf_detail,
     bf_record,
     deadline,
     fv_detail,
     fv_record,
+    hs_record,
     open_db,
     record,
     sbs_record,
@@ -133,7 +136,13 @@ def _observations(hist: sqlite3.Connection) -> tuple[int, ...]:
     a loss in the other (M5 review)."""
     return tuple(
         hist.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-        for t in ("observations", "bf_observations", "fv_observations", "sbs_observations")
+        for t in (
+            "observations",
+            "bf_observations",
+            "fv_observations",
+            "sbs_observations",
+            "hs_observations",
+        )
     )
 
 
@@ -300,6 +309,14 @@ def _watch_sbs(hist, cfg, now, get, sleep) -> tuple[int, list]:
     return len(listings), []
 
 
+def _watch_hs(hist, cfg, now, get) -> tuple[int, list]:
+    """Heimstaden is digest only: one list page (all of Sweden, checked against its total),
+    the configured district recorded, no alerts (Simon, 2026-11-26/27)."""
+    listings = parse_hs_page(get(HS_LIST_URL), now, cfg.heimstaden.district)
+    hs_record(hist, listings, now)
+    return len(listings), []
+
+
 def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, list]:
     listings = parse_list(load_jsonp(get(list_url())), now)
     if not listings:
@@ -347,6 +364,7 @@ def run(
     bf_get: Callable[[str], str] | None = None,
     fv_get: Callable[[str], str] | None = None,
     sbs_get: Callable[[str], str] | None = None,
+    hs_get: Callable[[str], str] | None = None,
     send: Callable[[Alert], object],
     sleep: Callable[[float], object],
     now: datetime,
@@ -356,8 +374,9 @@ def run(
 ) -> int:
     """One scheduled run. Returns 0 (ok or skipped) or 1 (SSSB or BF failed, saved and ready).
 
-    `bf_get` fetches Bostadsförmedlingen, `fv_get` Förvaltaren and `sbs_get` SBS (its own
-    guard, `sbs.every_hours`); None leaves that source out (tests of one source).
+    `bf_get` fetches Bostadsförmedlingen, `fv_get` Förvaltaren, `sbs_get` SBS and `hs_get`
+    Heimstaden (the last two with their own guard, `every_hours`); None leaves that source
+    out (tests of one source).
 
     Setup problems (config, QUEUE_DAYS, key, missing or unexpected files, a shrinking
     history) raise instead, before `ready` exists, so nothing is pushed. A bad per-source
@@ -463,6 +482,14 @@ def run(
                     lambda: _watch_sbs(hist, cfg, now, sbs_get, sleep),
                     ok_guard=cfg.sbs.every - GUARD_SLACK,
                 )
+            if hs_get is not None:
+                part(
+                    "hs",
+                    "hs_last_fetch",
+                    "hs ",
+                    lambda: _watch_hs(hist, cfg, now, hs_get),
+                    ok_guard=cfg.heimstaden.every - GUARD_SLACK,
+                )
             if ok:  # after every part, so it has this run's data and survives either failing
                 try:
                     alerts.append(
@@ -506,6 +533,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             bf_get=bf_get,
             fv_get=fv_get,
             sbs_get=sbs_get,
+            hs_get=hs_get,
             send=make_send(env.get("NTFY_TOPIC", "")),
             sleep=time.sleep,
             now=datetime.now(UTC),
