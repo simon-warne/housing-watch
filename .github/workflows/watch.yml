@@ -57,8 +57,9 @@ jobs:
         run: scripts/push-data.sh data
 
       - name: Keep the schedule alive
-        # GitHub pauses schedules after 60 days without repo activity (M0).
-        if: ${{ always() && github.event_name == 'schedule' }}
+        # GitHub pauses schedules after 60 days without repo activity (M0). On every watch run, not
+        # only `schedule`: most runs come from an external workflow_dispatch trigger (Simon, 2026-11-27).
+        if: ${{ always() && !inputs.test_alert }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

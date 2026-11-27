@@ -1,16 +1,16 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed, secret set); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-27 16:15, external trigger for watch runs (cron-job.org → `workflow_dispatch`) planned and repo side done (keep-alive on every run, `gaps.sh` counts dispatch runs; not pushed); Simon sets up the job. Earlier: 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed, secret set); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
 - Pushed: everything incl. M6 Heimstaden (5123e71, tag `m6-hs`); CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
-- Scheduling: two scheduled runs so far (02:23 UTC, failed on the BF ParseError the hotfix fixed; 11:22 UTC ok), nothing between. Workflow state `active`. Too early to judge (deadline 28 Nov).
+- Scheduling: GitHub's schedule ran twice in ~19 h and not at all 11:39–15:55 UTC on 27 Nov (config fine, GitHub best-effort cron). Fix decided: cron-job.org calls `workflow_dispatch` at :07/:37 UTC; `schedule` stays as a backup. Repo side done, the job is Simon's to set up (below). Only the 4 manual runs of 26 Nov remain in run history (today's were deleted).
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
 1. **Check the next watch run** (FV_POINTS_AT added 11:42 UTC and pushed; the 4 watch runs with masked zeros deleted): the log shows `Version: 2026…` (no `***`) and `fv ok: N`, and no "FV: setup problem" note on the phone.
-2. **Watch scheduling:** `gh run list -w watch`. Scheduled runs should come about every 30 min. If they're still hours apart by 28 Nov, the keep-alive guess was wrong: try an external trigger (workflow_dispatch from a cron service) or ask GitHub Support.
+2. **Set up the external trigger** (Simon, see "Open for Simon"), then check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
 5. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
@@ -18,6 +18,11 @@ Updated: 2026-11-27 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed,
 7. **Next session: M6 Wallenstam**, after its relaunch on 1 Dec (re-check the site first, plan first). Then HomeQ (read its terms, then one POST search).
 
 ## Open for Simon
+- **Push** the external-trigger commit, then set up the trigger (no values go in the repo):
+  1. GitHub › Settings › Developer settings › Fine-grained tokens: only repo `housing-watch`, permission Actions: Read and write, expiry 1 year.
+  2. cron-job.org job: minutes 7 and 37, every hour, timezone UTC; `POST https://api.github.com/repos/<owner>/housing-watch/actions/workflows/watch.yml/dispatches`; headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`; body `{"ref":"main"}`; turn on failure notifications.
+  3. "Test run" in cron-job.org: expect HTTP 204 and a new `workflow_dispatch` run.
+- Renew the trigger token before it expires (calendar reminder ~11 months after creating it).
 - Log in to Heimstaden every 180 days (account deleted otherwise) and to Förvaltaren once a year.
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.
 - Detail cap of 10 (per source): raise it? BF listings closing tonight take most of the 10 slots until they close.
@@ -35,6 +40,7 @@ Updated: 2026-11-27 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed,
 - BF: `Inflyttningsdatum` is null in the list (move-in only on the detail page, sometimes as text); deadline is a date without a time; no robots.txt.
 - `/widgets/` ignores `pagination` and unknown `omr=`. `TOTAL@lagenheter` ignores filters.
 - Fixture responses carry a session `CSRFtoken`: replace it before committing new fixtures.
+- GitHub's `schedule` is best-effort and can skip hours in a new repo: runs come from an external `workflow_dispatch` trigger. A leaked trigger token can start runs (guards stop extra fetches) or send the test alert, but can't read secrets or push.
 - Claude can't push (blocked by the permission check); Simon pushes. There's no local `gitleaks` (CI runs it).
 - `hyra` uses a non-breaking space (`\xa0`). `parse_detail` needs the listing's objektNr.
 - SQLite UNIQUE treats NULLs as distinct, so dedupe uses a `COALESCE` index (in `state.db`).

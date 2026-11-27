@@ -73,9 +73,12 @@ def test_push_runs_after_failures_but_not_for_test_alerts():
     assert push["run"] == "scripts/push-data.sh data"
 
 
-def test_keep_alive_on_schedule_and_never_fails_the_run():
+def test_keep_alive_on_every_watch_run_and_never_fails_the_run():
     k = _step("Keep the schedule alive")
-    assert "github.event_name == 'schedule'" in k["if"]
+    # Runs come mostly from an external workflow_dispatch trigger (Simon, 2026-11-27): GitHub's
+    # schedule rarely fires, so a schedule-only keep-alive would miss its weekly window.
+    assert "always()" in k["if"] and "!inputs.test_alert" in k["if"]
+    assert "event_name" not in k["if"]
     assert k["continue-on-error"] is True
     assert "workflows/watch.yml/enable" in k["run"]
     # Weekly only (Simon, 2026-11-27): re-enabling every run may re-register the schedule.
