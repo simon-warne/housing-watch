@@ -17,7 +17,7 @@ from housing_watch.sssb import STOCKHOLM, TIMEOUT_S, USER_AGENT, ParseError
 
 BASE = "https://www.forvaltaren.se"
 LIST_URL = BASE + "/wp-json/fv/v1/objects?group_id=1&group_slug=lagenhet"
-_ID = re.compile(r"\d{1,4}(?:-\d{1,5}){3}")
+_ID = re.compile(r"\d{1,4}(?:-\d{1,5}){3}[A-Z]?")  # e.g. 73-32-1-0102, 11-08-1-402B (27 Nov)
 _DETAIL = re.compile(re.escape(BASE) + r"/objekt/(" + _ID.pattern + ")")
 _ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
 _DEADLINE = re.compile(r"(\d{4}-\d{2}-\d{2})T00:00:00")
@@ -28,7 +28,7 @@ CLOSES_AT = time(23, 59)  # "Anmäl senast" is a date; read as the end of that d
 
 @dataclass(frozen=True)
 class FvListing:
-    id: str  # Objektnummer, e.g. 73-32-1-0102
+    id: str  # Objektnummer, e.g. 73-32-1-0102 or 11-08-1-402B
     area: str  # areaname
     address: str
     municipality: str  # address3

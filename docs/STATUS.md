@@ -1,17 +1,17 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 16:15, external trigger for watch runs (cron-job.org → `workflow_dispatch`) planned and repo side done (keep-alive on every run, `gaps.sh` counts dispatch runs; not pushed); Simon sets up the job. Earlier: 11:50, FV points moved to one secret `FV_POINTS_AT` (pushed, secret set); M6 Heimstaden done and pushed (tag `m6-hs`). Earlier the same day: BF hotfix + keep-alive change (pushed; manual run 09:05 UTC gave `ok: 23 · bf ok: 566 · fv ok: 11 · sbs ok: 16`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-27 18:20, FV ParseError hotfix (tests first, not pushed): Förvaltaren ids may end in a capital letter (`11-08-1-402B`); 806 tests pass. Earlier: 16:15, external trigger for watch runs (cron-job.org → `workflow_dispatch`, set up 17:04 UTC); 11:50, FV points in one secret `FV_POINTS_AT`; M6 Heimstaden done and pushed (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
-- Pushed: everything incl. M6 Heimstaden (5123e71, tag `m6-hs`); CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
+- Pushed: everything up to b992735 (external trigger). **Not pushed: the FV hotfix** (ids with a letter). CI green before it. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
 - Scheduling: GitHub's schedule ran twice in ~19 h and not at all 11:39–15:55 UTC on 27 Nov (config fine, GitHub best-effort cron). Fix decided: cron-job.org calls `workflow_dispatch` at :07/:37 UTC; `schedule` stays as a backup. Repo side done, the job is Simon's to set up (below). Only the 4 manual runs of 26 Nov remain in run history (today's were deleted).
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-0. **FV fails with ParseError** (first external-trigger run, 17:04 UTC: `ok: 23 · bf ok: 566 · fv failed: ParseError · sbs ok: 15 · hs ok: 18`; FV was ok at 09:35). Find the page that changed, fix tests first.
+0. **Push the FV hotfix**, then check the next run shows `fv ok: N` (25 flats listed at 17:09 UTC). Cause of the 17:04 failure: two flats with ids like `11-08-1-402B`; the id pattern allowed digits only, so the whole list raised.
 1. **Check the next watch run** (FV_POINTS_AT added 11:42 UTC and pushed; the 4 watch runs with masked zeros deleted): the log shows `Version: 2026…` (no `***`) and `fv ok: N`, and no "FV: setup problem" note on the phone.
-2. **Set up the external trigger** (Simon, see "Open for Simon"), then check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
+2. External trigger set up 17:04 UTC: check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
 5. After a week: `scripts/gaps.sh 7`, look for false alerts (SSSB and BF), and tick the M4 and M5 acceptance in the reports.
@@ -35,6 +35,7 @@ Updated: 2026-11-27 16:15, external trigger for watch runs (cron-job.org → `wo
 - SBS: the site's `?paged=N` link 301s to `/lediga-bostader/page/N/?qt_mll_search_tags=Stockholm`; request that directly. Cards have everything (no detail pages); the id is the URL slug; move-in can be "Enligt överenskommelse". `urllib` follows redirects by default: `sbs_get` uses its own handler (list pages only, one hop).
 - SBS empty result is `<p>Inga lägenheter matchar dina filterinställningar.</p>` in `div.listings`; only that shape reads as 0 listings. SBS's 6 h wait counts from the last *successful* fetch (`sbs_last_fetch_ok`).
 - A source guard longer than 30 min needs slack (`GUARD_SLACK`), or drifting runs push it a whole run later.
+- Förvaltaren ids can end in a capital letter (`11-08-1-402B`, first seen 27 Nov); the run log only shows `fv failed: ParseError`, so reproduce by parsing one live list locally.
 - Förvaltaren: the list has no move-in and no top points (both only on `/objekt/<id>`); the detail page repeats its fact list twice (both copies must agree); the deadline is a date (read as 23:59); floor can be negative. A missing "Högst köpoäng" row with applicants > 0 is a layout change, not "no applicants".
 - M6 sources: Förvaltaren `wp-json/fv/v1/objects` (all flats, `usercount` = applicants), detail `/objekt/<id>` has "Högst köpoäng"; HomeQ search is POST-only; Stena and Wallenstam Stockholm go via BF; Heimstaden list is one 3.8 MB HTML page.
 - Fixture pages from WordPress sites carry nonces (`restNonce`, `ajaxNonce`, `ajax_nonce`): replace before committing.

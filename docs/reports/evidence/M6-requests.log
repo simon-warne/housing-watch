@@ -44,3 +44,5 @@
 2026-11-26T22:13:08Z GET https://sbsstudent.se/lediga-bostader/?paged=2&qt_mll_search_tags=Stockholm -> 301 0 text/html; charset=UTF-8 (Location: https://sbsstudent.se/lediga-bostader/page/2/?qt_mll_search_tags=Stockholm; not followed)
 2026-11-26T22:25:39Z GET https://sbsstudent.se/lediga-bostader/page/2/?qt_mll_search_tags=Stockholm -> 200 117526 text/html; charset=UTF-8
 2026-11-27T08:13:33Z GET https://sbsstudent.se/lediga-bostader/?qt_mll_search_tags=Stockholm&qt_mll_monthly_rent_amount_max=1 -> 200 115441 text/html; charset=UTF-8
+2026-11-27T17:09:12Z GET https://www.forvaltaren.se/wp-json/fv/v1/objects?group_id=1&group_slug=lagenhet -> 200 107987 application/json (FV ParseError hotfix: ids with a letter)
+2026-11-27T17:09:31Z GET https://www.forvaltaren.se/objekt/11-08-1-402B -> 200 143311 text/html

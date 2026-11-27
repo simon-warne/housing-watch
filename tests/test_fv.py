@@ -131,6 +131,10 @@ def test_special_contract_text_is_kept():
         {"specialContract": 3},
         {"id": "73-32-1"},
         {"id": "../wp-admin"},
+        {"id": "73-32-1-0102b"},
+        {"id": "73-32-1-0102BB"},
+        {"id": "73-32-1-0102-B"},
+        {"id": "B73-32-1-0102"},
         {"objectType": {"id": 1}},
         {"objectType": "1 rum"},
     ],
@@ -162,6 +166,38 @@ def test_duplicate_ids_raise():
     p["rentalObjects"].append(p["rentalObjects"][0])
     with pytest.raises(ParseError):
         parse_fv_list(dump(p), SEEN)
+
+
+LIST_1127 = FIX / "2026-11-27-objects-lagenhet.json"
+DETAIL_402B = FIX / "2026-11-27-detail-11-08-1-402B.html"
+RISSNELEDEN = "11-08-1-402B"
+
+
+def test_ids_with_a_letter_parse():
+    """27 Nov: Förvaltaren started listing ids like 11-08-1-402B; the whole list raised."""
+    got = {x.id: x for x in parse_fv_list(text(LIST_1127), SEEN)}
+    assert len(got) == 25
+    assert {"11-08-1-402B", "11-28-2-302B"} <= set(got)
+    x = got[RISSNELEDEN]
+    assert (x.area, x.address, x.type, x.rooms, x.size_m2, x.rent, x.floor) == (
+        "Hallonbergen",
+        "Rissneleden 45",
+        "1 rum o kokskåp",
+        1,
+        15,
+        3639,
+        4,
+    )
+    assert (x.applicants, x.deadline) == (2, date(2026, 11, 30))
+
+
+def test_detail_of_an_id_with_a_letter():
+    x = next(x for x in parse_fv_list(text(LIST_1127), SEEN) if x.id == RISSNELEDEN)
+    assert detail_url(x) == "https://www.forvaltaren.se/objekt/11-08-1-402B"
+    assert parse_fv_detail(text(DETAIL_402B), x) == FvDetail(
+        move_in=date(2027, 1, 16), top_points=1117, applicants=2
+    )
+    assert fv_get(detail_url(x), opener=lambda *a, **k: FakeResponse(b"ok")) == "ok"
 
 
 def test_naive_seen_at_raises():
@@ -266,6 +302,8 @@ def test_fv_get_is_a_plain_get_with_our_user_agent():
         "https://www.forvaltaren.se/",
         "http://www.forvaltaren.se/objekt/73-32-1-0102",
         "https://www.forvaltaren.se/objekt/73-32-1-0102/../wp-admin",
+        "https://www.forvaltaren.se/objekt/73-32-1-0102b",
+        "https://www.forvaltaren.se/objekt/73-32-1-0102BB",
         "https://www.forvaltaren.se/wp-json/fv/v1/objects?group_id=3&group_slug=parkeringsplats",
         "https://minsida.forvaltaren.se/ledigt/detalj/id/73-32-1-0102",
         "https://www.forvaltaren.se.evil.example/objekt/73-32-1-0102",
