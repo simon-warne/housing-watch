@@ -9,6 +9,7 @@ Updated: 2026-11-27 16:15, external trigger for watch runs (cron-job.org → `wo
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
+0. **FV fails with ParseError** (first external-trigger run, 17:04 UTC: `ok: 23 · bf ok: 566 · fv failed: ParseError · sbs ok: 15 · hs ok: 18`; FV was ok at 09:35). Find the page that changed, fix tests first.
 1. **Check the next watch run** (FV_POINTS_AT added 11:42 UTC and pushed; the 4 watch runs with masked zeros deleted): the log shows `Version: 2026…` (no `***`) and `fv ok: N`, and no "FV: setup problem" note on the phone.
 2. **Set up the external trigger** (Simon, see "Open for Simon"), then check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
@@ -22,7 +23,7 @@ Updated: 2026-11-27 16:15, external trigger for watch runs (cron-job.org → `wo
   1. GitHub › Settings › Developer settings › Fine-grained tokens: only repo `housing-watch`, permission Actions: Read and write, expiry 1 year.
   2. cron-job.org job: minutes 7 and 37, every hour, timezone UTC; `POST https://api.github.com/repos/<owner>/housing-watch/actions/workflows/watch.yml/dispatches`; headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`; body `{"ref":"main"}`; turn on failure notifications.
   3. "Test run" in cron-job.org: expect HTTP 204 and a new `workflow_dispatch` run.
-- Renew the trigger token before it expires (calendar reminder ~11 months after creating it).
+- Trigger set up 27 Nov 17:04 UTC (test run 204, the run started). Token expires **2027-11-26**: renew before. GitHub says API version `2022-11-28` (the `X-GitHub-Api-Version` header) is deprecated, sunset **10 Mar 2028**: update the header before then.
 - Log in to Heimstaden every 180 days (account deleted otherwise) and to Förvaltaren once a year.
 - Optional: ask GitHub Support to purge cached views of the pre-redaction commits.
 - Detail cap of 10 (per source): raise it? BF listings closing tonight take most of the 10 slots until they close.
