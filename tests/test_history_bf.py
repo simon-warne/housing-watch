@@ -144,6 +144,8 @@ def test_v1_db_migrates_in_place_and_keeps_sssb_rows(tmp_path):
     sssb = parse_list(load_jsonp((FIX / "2026-11-26-list.jsonp").read_text("utf-8")), T0)
     c = open_db(path)
     record(c, sssb, {}, T0)
+    c.execute("DROP TABLE hs_observations")
+    c.execute("DROP TABLE hs_listings")
     c.execute("DROP TABLE sbs_observations")
     c.execute("DROP TABLE sbs_listings")
     c.execute("DROP TABLE fv_observations")

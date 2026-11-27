@@ -79,3 +79,12 @@ sbs:
   every_hours: 6
   # Never more list pages than this in one run (16 listings = 2 pages today).
   max_pages: 5
+
+# Heimstaden (M6, Simon 2026-11-26/27). Digest only: no competition figure. Rent and move-in
+# window as above, no stretch. One page holds every Swedish listing; only this district counts.
+heimstaden:
+  district: Stor-Stockholm
+  # Watched "rooms" values; anything else is shown as "other type".
+  rooms: [1 rum och kök, 1 rum och kokvrå]
+  # Own guard: the list page (~3.8 MB) at most this often.
+  every_hours: 6

@@ -53,6 +53,13 @@ class SbsConfig:
 
 
 @dataclass(frozen=True)
+class HsConfig:
+    district: str  # Heimstaden's district_name in scope (Simon, 2026-11-27)
+    rooms: tuple[str, ...]  # watched "rooms" values; others = other type
+    every: timedelta  # own guard: Heimstaden is digest only (Simon, 2026-11-26)
+
+
+@dataclass(frozen=True)
 class Config:
     alert_types: tuple[str, ...]
     digest_types: tuple[str, ...]
@@ -68,6 +75,7 @@ class Config:
     bf: BfConfig
     fv: FvConfig
     sbs: SbsConfig
+    heimstaden: HsConfig
 
     def tier(self, area: str) -> int:
         """0 = best; unlisted areas rank last (len(area_tiers))."""
@@ -158,6 +166,7 @@ def load_config(path: str | Path) -> Config:
         "bf",
         "fv",
         "sbs",
+        "heimstaden",
     }
     d = _keys(raw, top, "config")
     alert_types, digest_types = _types(d["types"], "types")
@@ -212,6 +221,17 @@ def load_config(path: str | Path) -> Config:
     if pages > 20:
         raise ConfigError("sbs.max_pages: at most 20")
 
+    hs = _keys(d["heimstaden"], {"district", "rooms", "every_hours"}, "heimstaden")
+    if not isinstance(hs["district"], str) or not hs["district"].strip():
+        raise ConfigError("heimstaden.district: expected a name")
+    hs_every = hs["every_hours"]
+    if (
+        isinstance(hs_every, bool)
+        or not isinstance(hs_every, int | float)
+        or not 0.5 <= hs_every <= 24
+    ):
+        raise ConfigError("heimstaden.every_hours: expected a number in [0.5, 24]")
+
     return Config(
         alert_types=alert_types,
         digest_types=digest_types,
@@ -236,6 +256,11 @@ def load_config(path: str | Path) -> Config:
             rooms=_names(sbs["rooms"], "sbs.rooms"),
             every=timedelta(hours=every),
             max_pages=pages,
+        ),
+        heimstaden=HsConfig(
+            district=hs["district"].strip(),
+            rooms=_names(hs["rooms"], "heimstaden.rooms"),
+            every=timedelta(hours=hs_every),
         ),
     )
 

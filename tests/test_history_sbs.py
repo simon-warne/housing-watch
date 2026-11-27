@@ -155,7 +155,7 @@ def test_v3_db_migrates_in_place_and_keeps_other_rows(tmp_path):
     c.close()
 
     c = open_db(path)
-    assert c.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 4
+    assert c.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     for t, rows in dump.items():
         assert [tuple(r) for r in c.execute(f"SELECT * FROM {t} ORDER BY id")] == rows
     assert n(c, "sbs_listings") == 0

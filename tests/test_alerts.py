@@ -388,6 +388,8 @@ def test_history_db_holds_no_alerts(hist, state, tmp_path):
         "fv_observations",
         "sbs_listings",
         "sbs_observations",
+        "hs_listings",
+        "hs_observations",
     }
     raw = (tmp_path / "history.sqlite").read_bytes()
     assert b"you have" not in raw and b"Winnable" not in raw

@@ -266,3 +266,33 @@ def test_bad_sbs_section_raises(tmp_path, edit):
     edit(data)
     with pytest.raises(ConfigError):
         load_config(write(tmp_path, data))
+
+
+# --- M6: Heimstaden ---
+def test_real_config_heimstaden_section():
+    hs = load_config(REAL).heimstaden
+    assert hs.district == "Stor-Stockholm"
+    assert hs.rooms == ("1 rum och kök", "1 rum och kokvrå")
+    assert hs.every == timedelta(hours=6)
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda d: d.pop("heimstaden"),
+        lambda d: d["heimstaden"].pop("district"),
+        lambda d: d["heimstaden"].update(district=""),
+        lambda d: d["heimstaden"].update(district=["Stor-Stockholm"]),
+        lambda d: d["heimstaden"].pop("rooms"),
+        lambda d: d["heimstaden"].update(rooms=[]),
+        lambda d: d["heimstaden"].update(every_hours=0.25),  # never more often than every 30 min
+        lambda d: d["heimstaden"].update(every_hours=25),
+        lambda d: d["heimstaden"].update(every_hours=True),
+        lambda d: d["heimstaden"].update(extra=1),
+    ],
+)
+def test_bad_heimstaden_section_raises(tmp_path, edit):
+    data = real_data()
+    edit(data)
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path, data))
