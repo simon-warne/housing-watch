@@ -218,6 +218,8 @@ def parse_bf_detail(page: str, listing: BfListing) -> BfDetail:
     q = _QUEUE.search(page)
     if q is None:
         return BfDetail(move_in=move_in, top_dates=())
+    if not q.group(1).strip():  # nobody has applied yet: BF's live shape (Simon, 2026-11-27)
+        return BfDetail(move_in=move_in, top_dates=())
     raw = _LI.findall(q.group(1))
     if not 1 <= len(raw) <= 3 or not all(_ISO.fullmatch(r) for r in raw):
         raise ParseError("kötider", raw, listing.id)

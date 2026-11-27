@@ -79,6 +79,8 @@ def test_keep_alive_on_schedule_and_never_fails_the_run():
     assert "github.event_name == 'schedule'" in k["if"]
     assert k["continue-on-error"] is True
     assert "workflows/watch.yml/enable" in k["run"]
+    # Weekly only (Simon, 2026-11-27): re-enabling every run may re-register the schedule.
+    assert '"703"' in k["run"] and "exit 0" in k["run"]
 
 
 def test_backup_is_weekly_and_keeps_state_encrypted():

@@ -64,7 +64,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: gh api -X PUT "repos/$REPO/actions/workflows/watch.yml/enable" --silent
+        # Weekly only (Simon, 2026-11-27): re-enabling every run may re-register the schedule.
+        run: |
+          [ "$(date -u +%u%H)" = "703" ] || exit 0
+          gh api -X PUT "repos/$REPO/actions/workflows/watch.yml/enable" --silent
 
       - name: Weekly backup due?
         id: backup

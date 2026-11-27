@@ -1,6 +1,7 @@
 """M5 part B: Bostadsförmedlingen parser and fetch guard. Only saved pages in tests/fixtures/bf/."""
 
 import json
+import re
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -203,6 +204,30 @@ def test_detail_without_move_in_raises(listings):
 
 def test_queue_block_without_dates_raises(listings):
     page = text(CORRIDOR).replace("<li>2021-11-27</li>", "<li>snart</li>")
+    with pytest.raises(ParseError, match="kötider"):
+        parse_bf_detail(page, listings["202619429"])
+
+
+def _empty_queue(page: str, inner: str) -> str:
+    return re.sub(
+        r'(<ul class="u-m-t-half u-list-disc">)\s*<li>2021-11-27</li>.*?(</ul>)',
+        lambda m: m.group(1) + inner + m.group(2),
+        page,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
+def test_queue_block_with_empty_list_means_no_applicants(listings):
+    """BF's live shape for a listing nobody has applied to yet (202618849, 2026-11-27)."""
+    page = _empty_queue(text(CORRIDOR), "\n                            ")
+    assert "2021-11-27" not in page
+    assert parse_bf_detail(page, listings["202619429"]).top_dates == ()
+
+
+@pytest.mark.parametrize("inner", [" &nbsp; ", " <li></li> ", " <p>Inga</p> ", " Inga sökande "])
+def test_queue_block_with_odd_content_still_raises(listings, inner):
+    page = _empty_queue(text(CORRIDOR), inner)
     with pytest.raises(ParseError, match="kötider"):
         parse_bf_detail(page, listings["202619429"])
 
