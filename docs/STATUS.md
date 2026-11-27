@@ -2,7 +2,7 @@
 Updated: 2026-11-27 18:45, checked run 17:37 UTC (all ok); before that 18:20, FV ParseError hotfix (tests first, not pushed): Förvaltaren ids may end in a capital letter (`11-08-1-402B`); 806 tests pass. Earlier: 16:15, external trigger for watch runs (cron-job.org → `workflow_dispatch`, set up 17:04 UTC); 11:50, FV points in one secret `FV_POINTS_AT`; M6 Heimstaden done and pushed (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
 
 ## Where things stand
-- Pushed: everything up to 8b3bf09 (FV hotfix). CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
+- Pushed: everything up to 09a3cd2. CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
 - Scheduling: GitHub's schedule ran twice in ~19 h and not at all 11:39–15:55 UTC on 27 Nov (config fine, GitHub best-effort cron). Fix decided: cron-job.org calls `workflow_dispatch` at :07/:37 UTC; `schedule` stays as a backup. Repo side done, the job is Simon's to set up (below). Only the 4 manual runs of 26 Nov remain in run history (today's were deleted).
@@ -10,7 +10,7 @@ Updated: 2026-11-27 18:45, checked run 17:37 UTC (all ok); before that 18:20, FV
 
 ## Next, in order
 0. Done 27 Nov: FV hotfix pushed (CI green 17:24 UTC); watch run 17:37 UTC (`workflow_dispatch`) shows `fv ok: 25`, `Version: 2026…` unmasked.
-1. Check there's no "FV: setup problem" note on the phone.
+1. Done 27 Nov: no "FV: setup problem" note on the phone.
 2. External trigger set up 17:04 UTC: check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
 3. Sunday 29 Nov digest: check the "SBS:" and "Heimstaden:" lines and the `sbs ok` / `hs ok` log parts.
 4. Check Mina sidor's number against the computed one, and when the daily +1 lands.
