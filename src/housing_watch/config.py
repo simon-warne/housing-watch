@@ -318,7 +318,7 @@ def load_fv_points(env: Mapping[str, str], today: date) -> FvPoints | None:
 
 
 def load_booked(env: Mapping[str, str]) -> frozenset[str]:
-    """BOOKED_IDS: comma-separated objektNr (a GitHub variable). Empty or unset = none."""
+    """BOOKED_IDS: comma-separated objektNr (a GitHub secret). Empty or unset = none."""
     ids = [x.strip() for x in (env.get("BOOKED_IDS") or "").split(",") if x.strip()]
     if not all(_ID.fullmatch(x) for x in ids):
         raise ConfigError("BOOKED_IDS: expected comma-separated objektNr like 5102-3203-028")

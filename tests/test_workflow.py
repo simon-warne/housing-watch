@@ -17,6 +17,7 @@ ALLOWED_SECRETS = {
     "QUEUE_DAYS_UNTIL",
     "BF_QUEUE_SINCE",
     "FV_POINTS_AT",
+    "BOOKED_IDS",
 }
 
 
@@ -63,8 +64,10 @@ def test_no_secret_is_echoed_or_traced():
             assert f"${name}" not in run and f"${{{name}}}" not in run, (s.get("name"), name)
 
 
-def test_booked_ids_is_a_variable_not_in_logs():
-    assert _step("Watch")["env"]["BOOKED_IDS"] == "${{ vars.BOOKED_IDS }}"
+def test_booked_ids_is_a_secret_so_logs_mask_it():
+    # Variables are printed unmasked in the step's env block in the public logs; secrets are ***.
+    assert _step("Watch")["env"]["BOOKED_IDS"] == "${{ secrets.BOOKED_IDS }}"
+    assert "vars." not in str(_step("Watch")["env"])
 
 
 def test_push_runs_after_failures_but_not_for_test_alerts():

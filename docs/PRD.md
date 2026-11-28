@@ -92,4 +92,4 @@ Size **S** under `~/Documents/_hub/skills/code-setup/SKILL.md` (Rotunda retrospe
 1. ~~Logged-out access to queue-day figures~~ **Visible logged out (M0, 2026-11-26).**
 2. ~~Private or public repo~~ **Public (Simon, 26 Nov).** So: the ntfy topic, my queue days and the list of listings I booked live in GitHub secrets or variables, never in committed files or committed history; the stored listing data is public SSSB data anyway.
 3. ~~Where the database lives~~ **`data` branch (Simon, 2026-11-26).**
-4. ~~How I mark a listing as "booked"~~ **GitHub variable `BOOKED_IDS`, comma-separated objektNr (Simon, 2026-11-26).**
+4. ~~How I mark a listing as "booked"~~ **GitHub secret `BOOKED_IDS`, comma-separated objektNr (Simon, 2026-11-26; a secret instead of a variable since 2026-11-28, variables show in the public logs).**

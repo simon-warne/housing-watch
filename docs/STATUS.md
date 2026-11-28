@@ -1,5 +1,5 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on branch `hotfix-bf-half-floor` (merged into main 28 Nov with Simon's yes). Branch run 11:33 UTC: `ok: 23 listings · bf ok: 617 · fv ok: 25`. 829 tests pass. Earlier: 27 Nov FV capital-letter hotfix, external trigger, M6 Heimstaden (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md`.
+Updated: 2026-11-28 14:00 UTC. `BOOKED_IDS` moved from a repo variable to a secret (variables print unmasked in public logs; nothing leaked, it was unset). 829 tests pass. Before that: BF half-floor hotfix + ntfy failure alert merged into main 28 Nov (main run 12:07 UTC `bf ok: 617 · fv ok: 25`). Reports: `docs/reports/M0.md` to `M6.md`.
 
 ## Where things stand
 - main = ca47540; every watch run on main from 23:07 UTC 27 Nov failed with `bf failed: ParseError`: BF listing 202621041 (Idrottsgatan 5) has `Vaning: 0.5`. Fixed on `hotfix-bf-half-floor` (half floors in steps of 0.5). The 02:56 `schedule` run "passed" only because every guard skipped it. CI's failures were all 26 Nov gitleaks findings (two false positives, now in `.gitleaksignore`), green since.
@@ -22,6 +22,7 @@ Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on bran
 7. **Next session: M6 Wallenstam**, after its relaunch on 1 Dec (re-check the site first, plan first). Then HomeQ (read its terms, then one POST search).
 
 ## Open for Simon
+- **Commit and push** the `BOOKED_IDS` → secret change to main. To mark a booked listing: Settings › Secrets and variables › Actions › *Secrets* › `BOOKED_IDS` = `<objektNr>,<objektNr>` (retype the full list on every change). Don't recreate the variable: the workflow no longer reads it.
 - **Push** the external-trigger commit, then set up the trigger (no values go in the repo):
   1. GitHub › Settings › Developer settings › Fine-grained tokens: only repo `housing-watch`, permission Actions: Read and write, expiry 1 year.
   2. cron-job.org job: minutes 7 and 37, every hour, timezone UTC; `POST https://api.github.com/repos/<owner>/housing-watch/actions/workflows/watch.yml/dispatches`; headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`; body `{"ref":"main"}`; turn on failure notifications.
@@ -56,6 +57,7 @@ Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on bran
 - Tests that span days must allow for queue days growing (Pax, top 182, is tied on 28 Nov with 180 + 2).
 - Never write real queue days into docs or plans: use placeholders.
 - GitHub masks every log string equal to a secret: a short secret ("0") hides every match in public logs and shows that a secret has that value. Keep secrets long (`FV_POINTS_AT` = `<points>@<date>`). `BOOKED_IDS`'s pattern also accepts a date.
+- GitHub **variables** (`vars.*`) are printed unmasked in each step's `env:` block in the public run log; only secrets show as `***`. Anything private goes in a secret (`BOOKED_IDS` moved 28 Nov).
 - **Public signals leak too:** which listings get requests, the step's run time, and file sizes. Anything that varies with my days or bookings must not reach public history, logs or timing (`test_public_traces_do_not_depend_on_queue_days_or_bookings`).
 - A size test needs enough alerts to grow SQLite pages, or it passes without padding.
 - PyYAML reads a bare `on:` key as `True`.
