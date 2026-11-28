@@ -1,5 +1,5 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on branch `hotfix-bf-half-floor` (pushed, CI green, **not merged**). Branch run 11:33 UTC: `ok: 23 listings · bf ok: 617 · fv ok: 25`. 829 tests pass. Earlier: 27 Nov FV capital-letter hotfix, external trigger, M6 Heimstaden (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md`.
+Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on branch `hotfix-bf-half-floor` (merged into main 28 Nov with Simon's yes). Branch run 11:33 UTC: `ok: 23 listings · bf ok: 617 · fv ok: 25`. 829 tests pass. Earlier: 27 Nov FV capital-letter hotfix, external trigger, M6 Heimstaden (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md`.
 
 ## Where things stand
 - main = ca47540; every watch run on main from 23:07 UTC 27 Nov failed with `bf failed: ParseError`: BF listing 202621041 (Idrottsgatan 5) has `Vaning: 0.5`. Fixed on `hotfix-bf-half-floor` (half floors in steps of 0.5). The 02:56 `schedule` run "passed" only because every guard skipped it. CI's failures were all 26 Nov gitleaks findings (two false positives, now in `.gitleaksignore`), green since.
@@ -11,7 +11,7 @@ Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on bran
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-0. **Merge `hotfix-bf-half-floor` into main** (Simon's yes), then check the next main run shows `bf ok`. After that, the first failure on main should reach the phone as "housing-watch: run failed"; once one has, GitHub's Actions emails can go off (Settings › Notifications › Actions: "Only notify for failed workflows" off, or keep it for ci only).
+0. Merged 28 Nov: check the next main run shows `bf ok`. After that, the first failure on main should reach the phone as "housing-watch: run failed"; once one has, GitHub's Actions emails can go off (Settings › Notifications › Actions: "Only notify for failed workflows" off, or keep it for ci only).
 0. Done 27 Nov: FV hotfix pushed (CI green 17:24 UTC); watch run 17:37 UTC (`workflow_dispatch`) shows `fv ok: 25`, `Version: 2026…` unmasked.
 1. Done 27 Nov: no "FV: setup problem" note on the phone.
 2. External trigger set up 17:04 UTC: check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
