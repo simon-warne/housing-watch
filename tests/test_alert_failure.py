@@ -19,7 +19,8 @@ pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash
 
 def run(tmp_path, runs, *, gh_fails=False, topic=TOPIC):
     bin_ = tmp_path / "bin"
-    bin_.mkdir()
+    bin_.mkdir(exist_ok=True)
+    (tmp_path / "curl.args").unlink(missing_ok=True)
     (tmp_path / "runs.json").write_text(json.dumps(runs))
     gh = "exit 1" if gh_fails else f'echo "$@" > {tmp_path}/gh.args; cat {tmp_path}/runs.json'
     (bin_ / "gh").write_text(f"#!/usr/bin/env bash\n{gh}\n")
@@ -41,8 +42,8 @@ def run(tmp_path, runs, *, gh_fails=False, topic=TOPIC):
     return p, (curl.read_text().splitlines() if curl.exists() else None)
 
 
-def r(i, conclusion, status="completed"):
-    return {"databaseId": i, "status": status, "conclusion": conclusion}
+def r(i, conclusion, status="completed", title="watch"):
+    return {"databaseId": i, "status": status, "conclusion": conclusion, "displayTitle": title}
 
 
 def test_first_failure_after_a_success_alerts(tmp_path):
@@ -96,3 +97,19 @@ def test_asks_only_for_watch_runs_of_this_repo(tmp_path):
 def test_missing_topic_fails(tmp_path):
     p, curl = run(tmp_path, [r(499, "success")], topic=None)
     assert p.returncode != 0 and curl is None
+
+
+def test_cancelled_or_skipped_runs_do_not_split_a_streak(tmp_path):
+    # A run waiting in the concurrency group is cancelled when a newer one arrives.
+    runs = [r(RUN_ID, ""), r(499, "cancelled"), r(498, "skipped"), r(497, "failure")]
+    p, curl = run(tmp_path, runs)
+    assert curl is None and "already alerted" in p.stdout
+
+
+def test_test_alert_runs_do_not_count(tmp_path):
+    runs = [r(RUN_ID, ""), r(499, "success", title="watch test alert"), r(498, "failure")]
+    _, curl = run(tmp_path, runs)
+    assert curl is None
+    runs = [r(RUN_ID, ""), r(499, "failure", title="watch test alert"), r(498, "success")]
+    _, curl = run(tmp_path, runs)
+    assert curl is not None

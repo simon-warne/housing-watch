@@ -122,7 +122,7 @@ def _when(dt: datetime) -> str:
     return f"{d:%a} {d.day} {d:%b %H:%M}"
 
 
-def _floor(n: int) -> str:
+def _floor(n: float) -> str:
     return "ground floor" if n == 0 else f"floor {n}"
 
 

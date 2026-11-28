@@ -108,9 +108,15 @@ def test_failure_alert_is_the_last_step_once_per_failure():
     # and the script skips a run whose previous watch run failed too.
     a = STEPS[-1]
     assert a["name"] == "Alert on failure"
-    assert "failure()" in a["if"] and "github.run_attempt == 1" in a["if"]
+    assert "failure() || cancelled()" in a["if"]  # a 15-min timeout ends as cancelled
+    assert "github.run_attempt == 1" in a["if"] and "!inputs.test_alert" in a["if"]
     assert "always()" not in a["if"]
     assert a["env"]["NTFY_TOPIC"] == "${{ secrets.NTFY_TOPIC }}"
     assert a["env"]["RUN_ID"] == "${{ github.run_id }}"
     assert a["env"]["RUN_URL"].endswith("/actions/runs/${{ github.run_id }}")
     assert a["run"] == "scripts/alert-failure.sh"
+
+
+def test_test_alert_runs_have_their_own_title():
+    # alert-failure.sh leaves them out of the failure streak.
+    assert WF["run-name"] == "${{ inputs.test_alert && 'watch test alert' || 'watch' }}"
