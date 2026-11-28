@@ -11,7 +11,7 @@ Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on bran
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
-0. Merged 28 Nov: check the next main run shows `bf ok`. After that, the first failure on main should reach the phone as "housing-watch: run failed"; once one has, GitHub's Actions emails can go off (Settings › Notifications › Actions: "Only notify for failed workflows" off, or keep it for ci only).
+0. Done 28 Nov: merged (d131d15), ci green, main run 12:07 UTC `bf ok: 617 · fv ok: 25`. Next: the first failure on main should reach the phone as "housing-watch: run failed"; once one has, GitHub's Actions emails can go off (Settings › Notifications › Actions: "Only notify for failed workflows" off, or keep it for ci only).
 0. Done 27 Nov: FV hotfix pushed (CI green 17:24 UTC); watch run 17:37 UTC (`workflow_dispatch`) shows `fv ok: 25`, `Version: 2026…` unmasked.
 1. Done 27 Nov: no "FV: setup problem" note on the phone.
 2. External trigger set up 17:04 UTC: check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
