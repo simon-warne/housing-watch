@@ -1,5 +1,7 @@
 # False positives, checked 2026-11-28 (generic-api-key):
-# zoneinfo repr `key='Europe/Stockholm'` in M1 evidence
+# the Europe/Stockholm zoneinfo repr in M1 evidence
 9bbbbbd4d7fd67b475d961ed60fda20da69bbeaf:docs/reports/evidence/M1-parsed.txt:generic-api-key:25
 # Heimstaden's public chat-widget key (data-public-agent-key), part of their public page
 e4ecebe0c9e14ff1b23b416190844a0c3f2a2497:tests/fixtures/heimstaden/2026-11-26-detail-6937101-1210.html:generic-api-key:120
+# this file's own first version quoted the zoneinfo repr (branch commit, not force-pushed away)
+05492f252810787903bfa1ea32360a0c2848bae5:.gitleaksignore:generic-api-key:2
