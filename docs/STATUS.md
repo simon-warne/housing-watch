@@ -1,5 +1,5 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-28 15:00 UTC. Review of the whole repo (all green live; 0 gaps over 45 min) and four fixes on branch `review-fixes`, merge pending: one bad SSSB detail page no longer blocks SSSB (that listing gets no winnable/last call that run); a failed ntfy send fails the run; only SSSB, BF or FV failing (or a failed send) fails the run, so SBS/Heimstaden/digest blips and bad per-source secrets stay green; the "run failed" ping is main-only; actions off Node 20. 834 tests pass. Before that: `BOOKED_IDS` → secret (pushed, main = 231e911, ci green). Reports: `docs/reports/M0.md` to `M6.md`; review evidence `docs/reports/evidence/review-2026-11-28-*.txt`.
+Updated: 2026-11-28 15:00 UTC. Review of the whole repo (all green live; 0 gaps over 45 min) and four fixes, merged into main 15:10 UTC (cf32cf8; branch watch run 15:03 UTC `ok: 23 listings · bf ok: 617 · fv ok: 25`): one bad SSSB detail page no longer blocks SSSB (that listing gets no winnable/last call that run); a failed ntfy send fails the run; only SSSB, BF or FV failing (or a failed send) fails the run, so SBS/Heimstaden/digest blips and bad per-source secrets stay green; the "run failed" ping is main-only; actions off Node 20. 834 tests pass. Before that: `BOOKED_IDS` → secret (pushed, main = 231e911, ci green). Reports: `docs/reports/M0.md` to `M6.md`; review evidence `docs/reports/evidence/review-2026-11-28-*.txt`.
 
 ## Where things stand
 - main = 231e911 (BOOKED_IDS secret), every run green since 11:37 UTC 28 Nov. The 23:07–11:07 UTC failures were BF `Vaning: 0.5` (fixed, merged). The 02:56 `schedule` run "passed" only because every guard skipped it.
@@ -22,7 +22,7 @@ Updated: 2026-11-28 15:00 UTC. Review of the whole repo (all green live; 0 gaps 
 7. **Next session: M6 Wallenstam**, after its relaunch on 1 Dec (re-check the site first, plan first). Then HomeQ (read its terms, then one POST search).
 
 ## Open for Simon
-- **Merge `review-fixes` into main** once its CI and a branch watch run are green (Claude pushes the branch, main is yours). After the merge: SBS/HS failures no longer ping "run failed" (they get their own heartbeat after 3), and a bad BF/FV secret only sends its setup note.
+- Done 28 Nov: `review-fixes` merged. Check the next main runs: same log line as before, and no "run failed" ping for SBS/HS blips. A bad BF/FV secret now only sends its setup note (run stays green).
 - `BOOKED_IDS` is a secret now: Settings › Secrets and variables › Actions › *Secrets* › `BOOKED_IDS` = `<objektNr>,<objektNr>` (retype the full list on every change). Don't recreate the variable: the workflow no longer reads it.
 - **Push** the external-trigger commit, then set up the trigger (no values go in the repo):
   1. GitHub › Settings › Developer settings › Fine-grained tokens: only repo `housing-watch`, permission Actions: Read and write, expiry 1 year.
