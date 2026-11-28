@@ -102,6 +102,9 @@ DETAIL_CAP = 10  # detail requests per run
 LIVE_WINDOW = timedelta(hours=48)  # PRD §1: live top days this close to a deadline
 GUARD = timedelta(minutes=25)  # never two list fetches closer than this (plan M4)
 GUARD_SLACK = timedelta(minutes=5)  # runs drift: a longer source guard is its interval minus this
+# Only these fail the run (and so ping "run failed"): they send alerts. SBS, Heimstaden and the
+# digest only feed the weekly digest and rely on their own heartbeat (Simon, 2026-11-28).
+ALERTING = ("", "bf", "fv")
 
 
 class EmptyRun(Exception):
@@ -322,12 +325,21 @@ def _watch(hist, cfg, queue: QueueDays, booked, now, get, sleep) -> tuple[int, l
     if not listings:
         raise EmptyRun("0 listings parsed")
     details: dict[str, Detail] = {}
+    failed: set[str] = set()
+    errors: list[Exception] = []
     for x in pick_details(hist, listings, cfg, now):
         sleep(PAUSE_S)
-        details[x.id] = parse_detail(load_jsonp(get(detail_url(x))), x.id)
+        try:
+            details[x.id] = parse_detail(load_jsonp(get(detail_url(x))), x.id)
+        except (ParseError, OSError) as e:  # one odd or missing page must not block the others
+            failed.add(x.id)
+            errors.append(e)
     listings = [merge(x, details.get(x.id)) for x in listings]
     record(hist, listings, details, now)
-    return len(listings), listing_alerts(hist, cfg, queue, booked, now)
+    alerts = listing_alerts(hist, cfg, queue, booked, now, skip=frozenset(failed))
+    if errors:
+        raise PartialRun(errors[0], len(listings), alerts)
+    return len(listings), alerts
 
 
 def _secret(load: Callable[[], object]) -> tuple[object, ConfigError | None]:
@@ -372,7 +384,10 @@ def run(
     test_alert: bool = False,
     config: Path = CONFIG,
 ) -> int:
-    """One scheduled run. Returns 0 (ok or skipped) or 1 (SSSB or BF failed, saved and ready).
+    """One scheduled run. Returns 0 (ok or skipped) or 1 (saved and ready, but SSSB, BF or
+    Förvaltaren failed, or an alert could not be sent). Failures of SBS, Heimstaden or the
+    digest, and a bad per-source secret (it sends a setup note), keep 0: they show in the log
+    line and feed their own heartbeat (Simon, 2026-11-28).
 
     `bf_get` fetches Bostadsförmedlingen, `fv_get` Förvaltaren, `sbs_get` SBS and `hs_get`
     Heimstaden (the last two with their own guard, `every_hours`); None leaves that source
@@ -418,7 +433,7 @@ def run(
         try:
             before = _observations(hist)
             alerts: list = []
-            failures: list[Exception] = []
+            failures: list[Exception] = []  # only ALERTING sources: these fail the run
             parts: list[str] = []
             ok: list[str] = []
 
@@ -441,8 +456,7 @@ def run(
                     alerts.extend(found)
                     parts.append(f"{label}ok: {n}" + ("" if name else " listings"))
                     ok.append(name)
-                except ConfigError as e:  # a bad secret: one note, no heartbeat streak
-                    failures.append(e)
+                except ConfigError as e:  # a bad secret: one note (the signal), run stays green
                     alerts.append(setup_note(name, str(e)))
                     parts.append(f"{label}failed: ConfigError")
                 except Exception as e:  # noqa: BLE001 - every failure feeds the heartbeat
@@ -450,7 +464,8 @@ def run(
                         alerts.extend(e.alerts)
                         ok.append(name)  # recorded: the digest may use it
                         e = e.cause
-                    failures.append(e)
+                    if name in ALERTING:
+                        failures.append(e)
                     alerts.append(run_failed(state, now, f"{type(e).__name__}: {e}", source=name))
                     parts.append(f"{label}failed: {type(e).__name__}")
 
@@ -498,15 +513,17 @@ def run(
                         )
                     )
                     run_ok(state, source="digest")
-                except Exception as e:  # noqa: BLE001
-                    failures.append(e)
+                except Exception as e:  # noqa: BLE001 - digest only: own heartbeat, green
                     alerts.append(
                         run_failed(state, now, f"{type(e).__name__}: {e}", source="digest")
                     )
                     parts.append(f"digest failed: {type(e).__name__}")
-            dispatch(state, alerts, send, now)
+            # A failed send is retried next run, but fails this one (Simon, 2026-11-28).
+            unsent = bool(dispatch(state, alerts, send, now).failed)
+            if unsent:
+                parts.append("send failed")  # no count: alert counts are private
             line = " · ".join(parts)
-            failed = failures[0] if failures else None
+            failed = bool(failures) or unsent
             if any(n < b for n, b in zip(_observations(hist), before, strict=True)):
                 raise RuntimeError("history shrank; not saving")
         finally:

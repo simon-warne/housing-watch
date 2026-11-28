@@ -222,11 +222,14 @@ def listing_alerts(
     queue: QueueDays,
     booked: frozenset[str],
     now: datetime,
+    skip: frozenset[str] = frozenset(),
 ) -> list[Alert]:
     """Winnable, last call and lead lost for every active listing, urgent first, then by rank.
 
     Call this only after a successful run: on a failed run the DB still holds the previous
-    state, which may be stale.
+    state, which may be stale. `skip`: listings whose detail page failed this run get no
+    winnable or last call (their figure may be stale: M4's false-winnable risk). Lead lost
+    still counts, since a stale figure can only be too low (Simon, 2026-11-28).
     """
     mine = _mine(queue, now)
     window = timedelta(hours=cfg.last_call_hours) + GRACE
@@ -238,7 +241,7 @@ def listing_alerts(
             if x.top_days is not None and x.top_days > mine:
                 out.append((rank_key(v), _lead_lost(x, mine, dl)))
             continue
-        if not (v.eligible and v.ahead):
+        if x.id in skip or not (v.eligible and v.ahead):
             continue
         if dl and dl <= now:
             continue  # closed: SSSB may still list it, but booking is over (no false "winnable")

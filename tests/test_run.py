@@ -68,6 +68,8 @@ class FakeSSSB:
         )
         self.deadline = DEADLINE
         self.detail_top: dict[str, int] = {}
+        # objektNr → an exception to raise, or an objektintresse text that doesn't parse
+        self.bad_detail: dict[str, Exception | str] = {}
         self.calls: list[str] = []
         self.fail: Exception | None = None
 
@@ -103,6 +105,11 @@ class FakeSSSB:
             f"Denna bostad har bokats av {n} personer, varav den med flest ködagar "
             f"just nu har {top} ködagar."
         )
+        bad = self.bad_detail.get(nr)
+        if isinstance(bad, Exception):
+            raise bad
+        if bad is not None:
+            html["objektintresse"] = bad
         return _wrap(page)
 
     def detail_calls(self):
@@ -318,22 +325,65 @@ def test_three_failed_runs_send_the_heartbeat(tmp_path, sssb, kind):
     assert state_rows(tmp_path, "SELECT * FROM meta WHERE key = 'fail_count'") == []
 
 
-def test_detail_parse_error_fails_the_whole_run(tmp_path, sssb):
-    sssb.detail["html"]["objektintresse"] = "<p>Bokning stängd</p>"
-    orig = sssb.__call__
-
-    def get(url):
-        if "refid=" in url:
-            sssb.calls.append(url)
-            page = json.loads(json.dumps(sssb.detail))
-            return _wrap(page)
-        return orig(url)
-
-    rc = run(tmp_path, ENV, get=get, send=Phone(), sleep=Clock(), now=T0, init=True)
+@pytest.mark.parametrize(
+    ("bad", "err"),
+    [("<p>Bokning stängd</p>", "ParseError"), (OSError("timed out"), "OSError")],
+)
+def test_one_bad_detail_page_does_not_block_the_others(tmp_path, sssb, capsys, bad, err):
+    """Simon, 2026-11-28 (reverses M4's "a detail parse error fails the whole run"): the rest
+    are recorded and alert; the bad one gets no alert this run; SSSB still counts as failed."""
+    sssb.bad_detail[STRIX] = bad
+    rc, phone, _ = go(tmp_path, sssb, T0)
     assert rc == 1
+    assert capsys.readouterr().out.strip() == f"failed: {err}"
+    assert {a.listing_id for a in phone.got} == WINNABLE - {STRIX}
     conn = sqlite3.connect(tmp_path / "history.sqlite")
-    assert conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 24
     conn.close()
+    assert state_rows(tmp_path, "SELECT value FROM meta WHERE key = 'fail_count'") == [("1",)]
+    # Fixed by the next run: its detail is fetched again and it alerts.
+    del sssb.bad_detail[STRIX]
+    rc, phone, _ = go(tmp_path, sssb, T0 + timedelta(minutes=30))
+    assert rc == 0 and STRIX in {a.listing_id for a in phone.got}
+
+
+def test_no_last_call_for_a_listing_whose_detail_failed_this_run(tmp_path, sssb):
+    """M4's reason stands: a figure we couldn't refresh near close never alerts."""
+    sssb.set_items([i for i in sssb.items if i["objektNr"] in WINNABLE_LATE])  # under the cap
+    go(tmp_path, sssb, DEADLINE - timedelta(hours=60))  # deadlines known
+    sssb.bad_detail[STRIX] = OSError("timed out")
+    rc, phone, _ = go(tmp_path, sssb, DEADLINE - timedelta(hours=4))  # last-call window
+    assert rc == 1
+    assert STRIX not in {a.listing_id for a in phone.got}
+    assert {a.listing_id for a in phone.got if a.kind == "last_call"} == WINNABLE_LATE - {STRIX}
+
+
+# --- what fails the run (Simon, 2026-11-28) ---
+class DeadPhone:
+    def __call__(self, alert):
+        raise OSError("ntfy down")
+
+
+def test_a_failed_send_fails_the_run_and_is_retried(tmp_path, sssb, capsys):
+    rc, _, _ = go(tmp_path, sssb, T0, phone=DeadPhone())
+    assert rc == 1
+    assert capsys.readouterr().out.strip() == "ok: 24 listings · send failed"  # no count
+    assert state_rows(tmp_path, "SELECT * FROM alerts") == []
+    rc, phone, _ = go(tmp_path, sssb, T0 + timedelta(minutes=30))  # the next fetching run
+    assert rc == 0
+    assert {a.listing_id for a in phone.got} == WINNABLE
+
+
+def test_a_digest_failure_keeps_the_run_green(tmp_path, sssb, capsys, monkeypatch):
+    import housing_watch.run as r
+
+    def boom(*a, **k):
+        raise ValueError("made up")
+
+    monkeypatch.setattr(r, "digest_alert", boom)
+    rc, phone, _ = go(tmp_path, sssb, T0)
+    assert rc == 0 and {a.listing_id for a in phone.got} == WINNABLE
+    assert capsys.readouterr().out.strip() == "ok: 24 listings · digest failed: ValueError"
 
 
 # --- data safety ---

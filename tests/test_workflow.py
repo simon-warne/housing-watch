@@ -114,6 +114,7 @@ def test_failure_alert_is_the_last_step_once_per_failure():
     assert "failure() || cancelled()" in a["if"]  # a 15-min timeout ends as cancelled
     assert "github.run_attempt == 1" in a["if"] and "!inputs.test_alert" in a["if"]
     assert "always()" not in a["if"]
+    assert "github.ref == 'refs/heads/main'" in a["if"]  # branch runs never ping (Simon, 11-28)
     assert a["env"]["NTFY_TOPIC"] == "${{ secrets.NTFY_TOPIC }}"
     assert a["env"]["RUN_ID"] == "${{ github.run_id }}"
     assert a["env"]["RUN_URL"].endswith("/actions/runs/${{ github.run_id }}")
@@ -123,3 +124,13 @@ def test_failure_alert_is_the_last_step_once_per_failure():
 def test_test_alert_runs_have_their_own_title():
     # alert-failure.sh leaves them out of the failure streak.
     assert WF["run-name"] == "${{ inputs.test_alert && 'watch test alert' || 'watch' }}"
+
+
+def test_actions_run_on_node_24():
+    # Node 20 actions are deprecated on GitHub's runners (warning seen 28 Nov).
+    ci = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = [s for wf in (WF, ci) for j in wf["jobs"].values() for s in j["steps"]]
+    uses = [s["uses"] for s in steps if "uses" in s]
+    old = {"actions/checkout@v4", "astral-sh/setup-uv@v6", "actions/upload-artifact@v4"}
+    old |= {"gitleaks/gitleaks-action@v2"}
+    assert uses and not old & set(uses)

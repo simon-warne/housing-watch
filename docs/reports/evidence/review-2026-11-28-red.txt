@@ -1,0 +1,59 @@
+E       AssertionError: assert '--branch main' in 'run list -R owner/housing-watch --workflow watch.yml --limit 20 --json databaseId,status,conclusion,displayTitle\n'
+E       AssertionError: assert set() == {'2405-0508-0...909-0104-012'}
+E         
+E         Extra items in the right set:
+E         '7505-1302-028'
+E         '7909-0104-012'
+E         '2405-0508-011'
+E         '6202-4102-013'
+E         '2405-0509-005'
+E         Use -v to get more diff
+E       AssertionError: assert set() == {'2405-0508-0...909-0104-012'}
+E         
+E         Extra items in the right set:
+E         '7505-1302-028'
+E         '7909-0104-012'
+E         '2405-0508-011'
+E         '6202-4102-013'
+E         '2405-0509-005'
+E         Use -v to get more diff
+E       AssertionError: assert set() == {'2405-0508-0...909-0104-012'}
+E         
+E         Extra items in the right set:
+E         '7505-1302-028'
+E         '7909-0104-012'
+E         '2405-0508-011'
+E         '6202-4102-013'
+E         '2405-0509-005'
+E         '5201-0108-050'
+E         Use -v to get more diff
+E       assert 0 == 1
+E       assert (1 == 0)
+E       assert (1 == 0)
+E       assert (1 == 0)
+E       assert (1 == 0)
+E       assert (1 == 0)
+E       assert (1 == 0)
+E       assert 1 == 0
+E       assert (1 == 0)
+E       assert 1 == 0
+E       assert "github.ref == 'refs/heads/main'" in '${{ (failure() || cancelled()) && github.run_attempt == 1 && !inputs.test_alert }}'
+E       AssertionError: assert (['actions/checkout@v4', 'astral-sh/setup-uv@v6', 'actions/upload-artifact@v4', 'actions/checkout@v4', 'astral-sh/setup-uv@v6', 'gitleaks/gitleaks-action@v2'] and not ({'actions/checkout@v4', 'actions/upload-artifact@v4', 'astral-sh/setup-uv@v6'} & {'actions/checkout@v4', 'actions/upload-artifact@v4', 'astral-sh/setup-uv@v6', 'gitleaks/gitleaks-action@v2'}))
+E        +  where {'actions/checkout@v4', 'actions/upload-artifact@v4', 'astral-sh/setup-uv@v6', 'gitleaks/gitleaks-action@v2'} = set(['actions/checkout@v4', 'astral-sh/setup-uv@v6', 'actions/upload-artifact@v4', 'actions/checkout@v4', 'astral-sh/setup-uv@v6', 'gitleaks/gitleaks-action@v2'])
+FAILED tests/test_alert_failure.py::test_asks_only_for_watch_runs_of_this_repo
+FAILED tests/test_run.py::test_one_bad_detail_page_does_not_block_the_others[<p>Bokning st\xe4ngd</p>-ParseError]
+FAILED tests/test_run.py::test_one_bad_detail_page_does_not_block_the_others[bad1-OSError]
+FAILED tests/test_run.py::test_no_last_call_for_a_listing_whose_detail_failed_this_run
+FAILED tests/test_run.py::test_a_failed_send_fails_the_run_and_is_retried - a...
+FAILED tests/test_run.py::test_a_digest_failure_keeps_the_run_green - assert ...
+FAILED tests/test_run_bf.py::test_bad_queue_date_stops_only_bf_and_leaves_a_note
+FAILED tests/test_run_fv.py::test_bad_points_stop_only_fv_and_leave_a_note[bad0]
+FAILED tests/test_run_fv.py::test_bad_points_stop_only_fv_and_leave_a_note[bad1]
+FAILED tests/test_run_fv.py::test_bad_points_stop_only_fv_and_leave_a_note[bad2]
+FAILED tests/test_run_hs.py::test_hs_failure_does_not_stop_the_others - asser...
+FAILED tests/test_run_hs.py::test_a_bad_page_records_nothing - assert 1 == 0
+FAILED tests/test_run_sbs.py::test_sbs_failure_does_not_stop_sssb - assert (1...
+FAILED tests/test_run_sbs.py::test_a_page_that_doesnt_line_up_records_nothing
+FAILED tests/test_workflow.py::test_failure_alert_is_the_last_step_once_per_failure
+FAILED tests/test_workflow.py::test_actions_run_on_node_24 - AssertionError: ...
+16 failed, 818 passed in 8.44s

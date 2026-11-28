@@ -121,7 +121,7 @@ def test_six_hour_guard(tmp_path, sssb, sbs, capsys):
 def test_sbs_failure_does_not_stop_sssb(tmp_path, sssb, sbs, capsys):
     sbs.fail = OSError("down")
     rc, phone, _ = go(tmp_path, sssb, sbs, T0)
-    assert rc == 1 and len(phone.got) == 6
+    assert rc == 0 and len(phone.got) == 6  # digest only: green (Simon, 2026-11-28)
     assert capsys.readouterr().out.strip() == "ok: 24 listings · sbs failed: OSError"
     # A failure is retried next run (Simon, 2026-11-27): the heartbeat comes within ~1 h.
     for i in (1, 2):
@@ -145,7 +145,7 @@ def test_other_failures_do_not_stop_sbs(tmp_path, sssb, sbs, capsys):
 def test_a_page_that_doesnt_line_up_records_nothing(tmp_path, sssb, sbs, capsys):
     sbs.pages[page_url(2)] = sbs.pages[page_url(2)].replace("av 16", "av 17")
     rc, _, _ = go(tmp_path, sssb, sbs, T0)
-    assert rc == 1
+    assert rc == 0
     assert capsys.readouterr().out.strip() == "ok: 24 listings · sbs failed: ParseError"
     assert count(tmp_path, "SELECT COUNT(*) FROM sbs_observations") == 0
 

@@ -1,8 +1,8 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-28 14:00 UTC. `BOOKED_IDS` moved from a repo variable to a secret (variables print unmasked in public logs; nothing leaked, it was unset). 829 tests pass. Before that: BF half-floor hotfix + ntfy failure alert merged into main 28 Nov (main run 12:07 UTC `bf ok: 617 · fv ok: 25`). Reports: `docs/reports/M0.md` to `M6.md`.
+Updated: 2026-11-28 15:00 UTC. Review of the whole repo (all green live; 0 gaps over 45 min) and four fixes on branch `review-fixes`, merge pending: one bad SSSB detail page no longer blocks SSSB (that listing gets no winnable/last call that run); a failed ntfy send fails the run; only SSSB, BF or FV failing (or a failed send) fails the run, so SBS/Heimstaden/digest blips and bad per-source secrets stay green; the "run failed" ping is main-only; actions off Node 20. 834 tests pass. Before that: `BOOKED_IDS` → secret (pushed, main = 231e911, ci green). Reports: `docs/reports/M0.md` to `M6.md`; review evidence `docs/reports/evidence/review-2026-11-28-*.txt`.
 
 ## Where things stand
-- main = ca47540; every watch run on main from 23:07 UTC 27 Nov failed with `bf failed: ParseError`: BF listing 202621041 (Idrottsgatan 5) has `Vaning: 0.5`. Fixed on `hotfix-bf-half-floor` (half floors in steps of 0.5). The 02:56 `schedule` run "passed" only because every guard skipped it. CI's failures were all 26 Nov gitleaks findings (two false positives, now in `.gitleaksignore`), green since.
+- main = 231e911 (BOOKED_IDS secret), every run green since 11:37 UTC 28 Nov. The 23:07–11:07 UTC failures were BF `Vaning: 0.5` (fixed, merged). The 02:56 `schedule` run "passed" only because every guard skipped it.
 - New: the watch workflow's last step "Alert on failure" (`scripts/alert-failure.sh`) posts "housing-watch: run failed" + run URL to ntfy, once per failure streak (first attempt only; skipped if the previous counted watch run failed; cancelled/skipped/test-alert runs don't count; also on timeout). Not yet seen firing live (tested with fakes).
 - Claude can push feature branches now (worked 28 Nov); main still needs Simon's yes.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
@@ -22,7 +22,8 @@ Updated: 2026-11-28 14:00 UTC. `BOOKED_IDS` moved from a repo variable to a secr
 7. **Next session: M6 Wallenstam**, after its relaunch on 1 Dec (re-check the site first, plan first). Then HomeQ (read its terms, then one POST search).
 
 ## Open for Simon
-- **Commit and push** the `BOOKED_IDS` → secret change to main. To mark a booked listing: Settings › Secrets and variables › Actions › *Secrets* › `BOOKED_IDS` = `<objektNr>,<objektNr>` (retype the full list on every change). Don't recreate the variable: the workflow no longer reads it.
+- **Merge `review-fixes` into main** once its CI and a branch watch run are green (Claude pushes the branch, main is yours). After the merge: SBS/HS failures no longer ping "run failed" (they get their own heartbeat after 3), and a bad BF/FV secret only sends its setup note.
+- `BOOKED_IDS` is a secret now: Settings › Secrets and variables › Actions › *Secrets* › `BOOKED_IDS` = `<objektNr>,<objektNr>` (retype the full list on every change). Don't recreate the variable: the workflow no longer reads it.
 - **Push** the external-trigger commit, then set up the trigger (no values go in the repo):
   1. GitHub › Settings › Developer settings › Fine-grained tokens: only repo `housing-watch`, permission Actions: Read and write, expiry 1 year.
   2. cron-job.org job: minutes 7 and 37, every hour, timezone UTC; `POST https://api.github.com/repos/<owner>/housing-watch/actions/workflows/watch.yml/dispatches`; headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`; body `{"ref":"main"}`; turn on failure notifications.
@@ -39,6 +40,9 @@ Updated: 2026-11-28 14:00 UTC. `BOOKED_IDS` moved from a repo variable to a secr
 - SBS: the site's `?paged=N` link 301s to `/lediga-bostader/page/N/?qt_mll_search_tags=Stockholm`; request that directly. Cards have everything (no detail pages); the id is the URL slug; move-in can be "Enligt överenskommelse". `urllib` follows redirects by default: `sbs_get` uses its own handler (list pages only, one hop).
 - SBS empty result is `<p>Inga lägenheter matchar dina filterinställningar.</p>` in `div.listings`; only that shape reads as 0 listings. SBS's 6 h wait counts from the last *successful* fetch (`sbs_last_fetch_ok`).
 - A source guard longer than 30 min needs slack (`GUARD_SLACK`), or drifting runs push it a whole run later.
+- SSSB, BF and FV detail pages each fail alone (`PartialRun`); a listing whose SSSB detail failed this run gets no winnable/last call (its figure may be stale) but lead lost still goes out. The log then shows `failed: <Type>` while the rest alert.
+- Only `ALERTING` sources (`run.py`: SSSB, BF, FV) and failed sends make the run red; SBS, Heimstaden and digest failures show only in the log line and their heartbeat.
+- setup-uv has no moving major tag since v8: pinned `v10.4.0`; bump by hand.
 - BF `Vaning` can be a half floor (0.5, a split level; first seen 28 Nov). One odd listing fails the whole BF part: reproduce by fetching `/AllaAnnonser/` once and running `parse_bf_list` locally.
 - Local `gitleaks` exists now (8.30; CI uses 8.24): `check.sh` scans full history. Never put key-like text (`key='…'`) in `.gitleaksignore` comments: CI's 8.24 flags it.
 - Förvaltaren ids can end in a capital letter (`11-08-1-402B`, first seen 27 Nov); the run log only shows `fv failed: ParseError`, so reproduce by parsing one live list locally.

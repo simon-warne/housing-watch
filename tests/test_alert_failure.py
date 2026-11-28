@@ -92,6 +92,7 @@ def test_asks_only_for_watch_runs_of_this_repo(tmp_path):
     run(tmp_path, [r(499, "success")])
     args = (tmp_path / "gh.args").read_text()
     assert "run list" in args and "owner/housing-watch" in args and "watch.yml" in args
+    assert "--branch main" in args  # only main's runs make a streak (Simon, 2026-11-28)
 
 
 def test_missing_topic_fails(tmp_path):

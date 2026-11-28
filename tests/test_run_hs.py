@@ -100,7 +100,7 @@ def test_six_hour_guard(tmp_path, sssb, hs, capsys):
 def test_hs_failure_does_not_stop_the_others(tmp_path, sssb, hs, capsys):
     hs.fail = OSError("down")
     rc, phone = go(tmp_path, sssb, hs, T0, sbs=FakeSBS())
-    assert rc == 1 and len(phone.got) == 6
+    assert rc == 0 and len(phone.got) == 6  # digest only: green (Simon, 2026-11-28)
     assert capsys.readouterr().out.strip() == ("ok: 24 listings · sbs ok: 16 · hs failed: OSError")
     # Retried next run; the heartbeat comes after three failures.
     for i in (1, 2):
@@ -126,7 +126,7 @@ def test_a_bad_page_records_nothing(tmp_path, sssb, hs, capsys):
     hs.page = PAGE.replace('"total_nr_of_objects":423', '"total_nr_of_objects":424')
     assert hs.page != PAGE
     rc, _ = go(tmp_path, sssb, hs, T0)
-    assert rc == 1
+    assert rc == 0
     assert capsys.readouterr().out.strip() == "ok: 24 listings · hs failed: ParseError"
     assert count(tmp_path, "SELECT COUNT(*) FROM hs_observations") == 0
 

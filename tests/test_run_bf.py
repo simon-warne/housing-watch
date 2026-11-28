@@ -234,7 +234,7 @@ def test_no_queue_date_records_but_does_not_alert(tmp_path, sssb, bf):
 def test_bad_queue_date_stops_only_bf_and_leaves_a_note(tmp_path, sssb, bf, capsys):
     """Simon, 2026-11-26: a bad BF secret stops BF's part only, with a note on the phone."""
     rc, phone, _ = go(tmp_path, sssb, bf, T0, env={**ENV_BF, "BF_QUEUE_SINCE": "soon"})
-    assert rc == 1 and bf.calls == [] and sssb.calls
+    assert rc == 0 and bf.calls == [] and sssb.calls
     assert capsys.readouterr().out.strip() == "ok: 24 listings · bf failed: ConfigError"
     [note] = [a for a in phone.got if a.kind == "setup"]
     assert note.title == "BF: setup problem, not watching"
