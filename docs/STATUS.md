@@ -1,14 +1,17 @@
 # Status (overwritten at the end of every session)
-Updated: 2026-11-27 18:45, checked run 17:37 UTC (all ok); before that 18:20, FV ParseError hotfix (tests first, not pushed): Förvaltaren ids may end in a capital letter (`11-08-1-402B`); 806 tests pass. Earlier: 16:15, external trigger for watch runs (cron-job.org → `workflow_dispatch`, set up 17:04 UTC); 11:50, FV points in one secret `FV_POINTS_AT`; M6 Heimstaden done and pushed (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md` (M6 parts A–D).
+Updated: 2026-11-28 11:40 UTC. BF half-floor hotfix + ntfy failure alert on branch `hotfix-bf-half-floor` (pushed, CI green, **not merged**). Branch run 11:33 UTC: `ok: 23 listings · bf ok: 617 · fv ok: 25`. 829 tests pass. Earlier: 27 Nov FV capital-letter hotfix, external trigger, M6 Heimstaden (tag `m6-hs`). Reports: `docs/reports/M0.md` to `M6.md`.
 
 ## Where things stand
-- Pushed: everything up to 09a3cd2. CI green. Manual run 09:35 UTC: `ok: 23 · bf ok: 566 · fv ok: 13 · sbs skipped: recent fetch · hs ok: 19`. Claude can't push.
+- main = ca47540; every watch run on main from 23:07 UTC 27 Nov failed with `bf failed: ParseError`: BF listing 202621041 (Idrottsgatan 5) has `Vaning: 0.5`. Fixed on `hotfix-bf-half-floor` (half floors in steps of 0.5). The 02:56 `schedule` run "passed" only because every guard skipped it. CI's failures were all 26 Nov gitleaks findings (two false positives, now in `.gitleaksignore`), green since.
+- New: the watch workflow's last step "Alert on failure" (`scripts/alert-failure.sh`) posts "housing-watch: run failed" + run URL to ntfy, once per failure streak (first attempt only; skipped if the previous counted watch run failed; cancelled/skipped/test-alert runs don't count; also on timeout). Not yet seen firing live (tested with fakes).
+- Claude can push feature branches now (worked 28 Nov); main still needs Simon's yes.
 - Five sources in one scheduled run, each with its own guard, heartbeat and failure isolation: SSSB and BF (alerts), FV (alerts, "FV ·"), SBS and Heimstaden (digest only, every 6 h).
 - M6 Heimstaden: parses the page's `hose_objects_data` JSON (count = total), keeps `Stor-Stockholm` (20 today), watches "1 rum och kök/kokvrå" ≤ 6,000. Digest section "Heimstaden:" between SBS and BF. History schema v5. 792 tests pass. Report: `docs/reports/M6.md` part D.
 - Scheduling: GitHub's schedule ran twice in ~19 h and not at all 11:39–15:55 UTC on 27 Nov (config fine, GitHub best-effort cron). Fix decided: cron-job.org calls `workflow_dispatch` at :07/:37 UTC; `schedule` stays as a backup. Repo side done, the job is Simon's to set up (below). Only the 4 manual runs of 26 Nov remain in run history (today's were deleted).
 - With a Nov 2026 BF queue start, expect few BF alerts for now: top dates seen are 2020–2021.
 
 ## Next, in order
+0. **Merge `hotfix-bf-half-floor` into main** (Simon's yes), then check the next main run shows `bf ok`. After that, the first failure on main should reach the phone as "housing-watch: run failed"; once one has, GitHub's Actions emails can go off (Settings › Notifications › Actions: "Only notify for failed workflows" off, or keep it for ci only).
 0. Done 27 Nov: FV hotfix pushed (CI green 17:24 UTC); watch run 17:37 UTC (`workflow_dispatch`) shows `fv ok: 25`, `Version: 2026…` unmasked.
 1. Done 27 Nov: no "FV: setup problem" note on the phone.
 2. External trigger set up 17:04 UTC: check `gh run list -w watch` shows `workflow_dispatch` runs about every 30 min and `scripts/gaps.sh 1` has no gaps over 45 min after the start.
@@ -35,6 +38,8 @@ Updated: 2026-11-27 18:45, checked run 17:37 UTC (all ok); before that 18:20, FV
 - SBS: the site's `?paged=N` link 301s to `/lediga-bostader/page/N/?qt_mll_search_tags=Stockholm`; request that directly. Cards have everything (no detail pages); the id is the URL slug; move-in can be "Enligt överenskommelse". `urllib` follows redirects by default: `sbs_get` uses its own handler (list pages only, one hop).
 - SBS empty result is `<p>Inga lägenheter matchar dina filterinställningar.</p>` in `div.listings`; only that shape reads as 0 listings. SBS's 6 h wait counts from the last *successful* fetch (`sbs_last_fetch_ok`).
 - A source guard longer than 30 min needs slack (`GUARD_SLACK`), or drifting runs push it a whole run later.
+- BF `Vaning` can be a half floor (0.5, a split level; first seen 28 Nov). One odd listing fails the whole BF part: reproduce by fetching `/AllaAnnonser/` once and running `parse_bf_list` locally.
+- Local `gitleaks` exists now (8.30; CI uses 8.24): `check.sh` scans full history. Never put key-like text (`key='…'`) in `.gitleaksignore` comments: CI's 8.24 flags it.
 - Förvaltaren ids can end in a capital letter (`11-08-1-402B`, first seen 27 Nov); the run log only shows `fv failed: ParseError`, so reproduce by parsing one live list locally.
 - Förvaltaren: the list has no move-in and no top points (both only on `/objekt/<id>`); the detail page repeats its fact list twice (both copies must agree); the deadline is a date (read as 23:59); floor can be negative. A missing "Högst köpoäng" row with applicants > 0 is a layout change, not "no applicants".
 - M6 sources: Förvaltaren `wp-json/fv/v1/objects` (all flats, `usercount` = applicants), detail `/objekt/<id>` has "Högst köpoäng"; HomeQ search is POST-only; Stena and Wallenstam Stockholm go via BF; Heimstaden list is one 3.8 MB HTML page.
@@ -43,7 +48,7 @@ Updated: 2026-11-27 18:45, checked run 17:37 UTC (all ok); before that 18:20, FV
 - `/widgets/` ignores `pagination` and unknown `omr=`. `TOTAL@lagenheter` ignores filters.
 - Fixture responses carry a session `CSRFtoken`: replace it before committing new fixtures.
 - GitHub's `schedule` is best-effort and can skip hours in a new repo: runs come from an external `workflow_dispatch` trigger. A leaked trigger token can start runs (guards stop extra fetches) or send the test alert, but can't read secrets or push.
-- Claude can't push (blocked by the permission check); Simon pushes. There's no local `gitleaks` (CI runs it).
+- Claude pushes feature branches; pushes and merges to main are Simon's.
 - `hyra` uses a non-breaking space (`\xa0`). `parse_detail` needs the listing's objektNr.
 - SQLite UNIQUE treats NULLs as distinct, so dedupe uses a `COALESCE` index (in `state.db`).
 - `record()` needs every `Listing.seen_at` to equal the run's `seen_at`.
