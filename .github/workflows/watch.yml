@@ -86,3 +86,15 @@ jobs:
             data/history.sqlite
             data/state.db.enc
           retention-days: 90
+
+      - name: Alert on failure
+        # One ntfy alert per failure streak (Simon, 2026-11-28): never on a re-run attempt, and
+        # the script skips it when the previous watch run failed too.
+        if: ${{ failure() && github.run_attempt == 1 }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/alert-failure.sh

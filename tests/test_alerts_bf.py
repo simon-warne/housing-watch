@@ -65,6 +65,14 @@ def test_winnable_wording(hist):
     assert a.url == "https://bostad.stockholm.se/bostad/202619429/"
 
 
+def test_half_floor_survives_history_and_reads_as_floor(tmp_path):
+    xs = [replace(x, floor=0.5) if x.id == CORRIDOR else x for x in bf_listings()]
+    conn = hist_with(tmp_path, {CORRIDOR: DET}, xs)
+    [a] = bf_listing_alerts(conn, CFG, SINCE, FRESH, T0)
+    assert "Ruddammsvägen 65, floor 0.5" in a.body
+    conn.close()
+
+
 def test_no_queue_date_no_alerts(hist):
     assert bf_listing_alerts(hist, CFG, None, FRESH, T0) == []
 

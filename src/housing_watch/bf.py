@@ -53,7 +53,7 @@ class BfListing:
     rooms: float
     size_m2: float | None  # None only on project ads with several units
     rent: int | None  # kr/month; None only on project ads
-    floor: int | None  # 0 = BV; negative = below ground
+    floor: int | float | None  # 0 = BV; negative = below ground; 0.5 = half floor
     units: int  # Antal
     bostad_snabbt: bool
     advertised_from: date
@@ -112,6 +112,16 @@ def _iso(v: Any, key: str, nr: str | None) -> date:
         raise ParseError(key, v, nr) from None
 
 
+def _floor(v: Any, nr: str) -> int | float | None:
+    """A whole floor (int) or a half floor such as 0.5, a split level (Simon, 2026-11-28).
+    Any other fraction raises."""
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, int | float) or abs(v) > 200 or (v * 2) % 1:
+        raise ParseError("Vaning", v, nr)
+    return int(v) if v == int(v) else float(v)
+
+
 def _listing(item: Any, seen_at: datetime) -> BfListing:
     if not isinstance(item, dict):
         raise ParseError("AllaAnnonser", type(item).__name__, why="listing is not an object")
@@ -132,9 +142,7 @@ def _listing(item: Any, seen_at: datetime) -> BfListing:
     if rent is not None and (isinstance(rent, bool) or not isinstance(rent, int) or rent <= 0):
         raise ParseError("Hyra", rent, nr)
     size = optional("Yta")
-    floor = optional("Vaning")
-    if floor is not None and (isinstance(floor, bool) or not isinstance(floor, int)):
-        raise ParseError("Vaning", floor, nr)
+    floor = _floor(optional("Vaning"), nr)
     snabbt = _get(item, "BostadSnabbt", nr)
     if not isinstance(snabbt, bool):
         raise ParseError("BostadSnabbt", snabbt, nr)

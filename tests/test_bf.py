@@ -90,6 +90,35 @@ def test_project_ads_may_lack_rent_size_floor(listings):
     assert all(x.apartment_no is None or x.apartment_no for x in listings.values())
 
 
+# Half floors (Simon, 2026-11-28): 202621041 has Vaning 0.5 and made every BF run fail.
+LIST_28 = FIX / "2026-11-28-alla-annonser.json"
+
+
+def test_list_of_28_nov_parses_with_a_half_floor():
+    xs = {x.id: x for x in parse_bf_list(text(LIST_28), SEEN)}
+    assert len(xs) == 617
+    assert xs["202621041"].address == "Idrottsgatan 5"
+    assert xs["202621041"].floor == 0.5
+
+
+@pytest.mark.parametrize("value,floor", [(0.5, 0.5), (1.5, 1.5), (-0.5, -0.5), (2.0, 2), (3, 3)])
+def test_floor_whole_or_half(value, floor):
+    xs = items()
+    one = next(i for i in xs if i["Antal"] == 1 and not i["ProjektId"])
+    one["Vaning"] = value
+    got = {x.id: x for x in parse_bf_list(dump(xs), SEEN)}[str(one["LagenhetId"])].floor
+    assert got == floor and type(got) is type(floor)  # whole floors stay int ("floor 2")
+
+
+@pytest.mark.parametrize("value", [0.25, 1.3, "1", True, 1e300])
+def test_floor_other_fractions_raise(value):
+    xs = items()
+    one = next(i for i in xs if i["Antal"] == 1 and not i["ProjektId"])
+    one["Vaning"] = value
+    with pytest.raises(ParseError, match="Vaning"):
+        parse_bf_list(dump(xs), SEEN)
+
+
 def test_null_rent_on_a_single_flat_raises():
     xs = items()
     one = next(i for i in xs if i["Antal"] == 1 and not i["ProjektId"])

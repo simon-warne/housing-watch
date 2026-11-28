@@ -101,3 +101,16 @@ def test_watch_step_gets_the_fv_points():
     env = _step("Watch")["env"]
     assert env["FV_POINTS_AT"] == "${{ secrets.FV_POINTS_AT }}"
     assert "FV_POINTS" not in env and "FV_POINTS_ON" not in env
+
+
+def test_failure_alert_is_the_last_step_once_per_failure():
+    # One ntfy alert per failure streak (Simon, 2026-11-28): a re-run attempt never alerts,
+    # and the script skips a run whose previous watch run failed too.
+    a = STEPS[-1]
+    assert a["name"] == "Alert on failure"
+    assert "failure()" in a["if"] and "github.run_attempt == 1" in a["if"]
+    assert "always()" not in a["if"]
+    assert a["env"]["NTFY_TOPIC"] == "${{ secrets.NTFY_TOPIC }}"
+    assert a["env"]["RUN_ID"] == "${{ github.run_id }}"
+    assert a["env"]["RUN_URL"].endswith("/actions/runs/${{ github.run_id }}")
+    assert a["run"] == "scripts/alert-failure.sh"
